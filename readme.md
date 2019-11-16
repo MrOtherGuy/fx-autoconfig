@@ -126,7 +126,7 @@ Note that the callback will be invoked when any pref that starts with `userChrom
 
 ## Filesystem
 
-Scripts should use the `resources` folder for their files. The helper functions interacting with filesystem expect `resources` to be the root folder for script operations.
+Scripts should generally use the `resources` folder for their files. The helper functions interacting with filesystem expect `resources` to be the root folder for script operations.
 
 ### _ucUtils.getFSEntry(fileName) -> fileHandle || enumerator for entries in a folder
 
@@ -153,4 +153,17 @@ Attempts to read the content of the given fileHandle as text. Boolean metaOnly i
     _ucUtils.createFileURI("path\some.png")
 
 Return a valid file uri describing `<profileDir>\chrome\resources\path\some.png`
-   
+
+### _ucUtils.chromeDir
+
+Return an object with two properties
+
+    _ucUtils.chromeDir.uri // a file:/// uri
+    
+    _ucUtils.chromeDir.files -> enumerator for entries in chrome folder
+    
+    let entries = _ucUtils.chromeDir.files;
+    while(entries.hasMoreElements()){
+      let nextFile = entries.getNext().QueryInterface(Ci.nsIFile);
+      console.log(nextFile.leafName);
+    }
