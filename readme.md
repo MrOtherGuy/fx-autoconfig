@@ -1,14 +1,14 @@
 # Yet another userChrome.js manager
 
-The files in this repository create a toolkit to load arbitrary javascript files to be run in Firefox browser context.
+The files in this repository create a toolkit to load arbitrary javascript files to be run in Firefox browser context. This method relies on autoconfig functionality available in pre-release versions of Firefox.
 
 # Overview
 
-Files in `program` folder tell Firefox to load an additional javascript module file from the current Profile directory. The boot.jsm is the one tha implements loading and managing additional files.
+Files in `program` folder tell Firefox to load an additional javascript module file from the current Profile directory. The `boot.jsm` is the one tha implements loading and managing additional files.
 
 Since the files in `program` go to the main program installation path, they will affect all profiles that are being run using that executable.
 
-However, the bulk of the logic is located in profile folder with boot.jsm so if boot.jsm is not found there then the loader is simply not used.
+However, the bulk of the logic is located in profile folder with `boot.jsm` so if the file is not found there then the loader is simply not used.
 
 ## Warning!
 
@@ -19,16 +19,21 @@ Please note that malicious external programs can now inject custom logic to Fire
 ## Setting up program
 
 Copy the *contents* of the folder "program" (not the folder itself) to the program folder you want the changes to apply to.
-That means the config.js should end up to the same folder where firefox.exe is located
+That means the `config.js` should end up to the same folder where `firefox.exe` is located
 
 ### Note for Release and Beta versions
 
-Firefox will ignore the config.js file in release and beta versions. You will need either Developer Edition or Nightly. Only some functions in config.js are permitted in Release and Beta but the Components object that we require is not available.
+Firefox will ignore the config.js file in release and beta versions. You will need either Developer Edition or Nightly (unbranded build should also work). Only some functions in config.js are permitted in Release and Beta but the Components object that we require is not available.
 
 ## Setting up profile
 
 Copy the contents of the folder "profile" (not the folder itself) to the Firefox profile folder that you want to modify. If the profile already has a `chrome` folder (for userChrome.css or userContent.css) then the chrome folders should merge. Otherwise the chrome folder will be created.
 You should end up with `chrome` folder in the profile root, and three folders inside it - JS, resources and utils.
+
+There will be two files in the `chrome/utils/` folder:
+
+* `chrome.manifest` - registers file paths to chrome:// protocol
+* `boot.jsm` - implements user-script loading logic
 
 ## Deleting startup-cache
 
@@ -47,9 +52,9 @@ The startup-cache folder can be found as follows:
 
 The file extension for your custom scripts must be `.uc.js`
 
-Just put any such files in the scripts folder inside chrome folder, same folder where userChrome.css would be. By default the scripts folder is named `JS` but this is customizable by modifying boot.jsm.
+Just put any such files in the scripts folder inside chrome folder, same folder where userChrome.css would be. By default the scripts folder is named `JS` but this is customizable by modifying `chrome.manifest`. For example change `../JS/` to `../scripts/` to make Firefox load scripts from "scripts" folder.
 
-At runtime, individual scripts can be toggled on/off from menubar -> tools -> userScripts. Note that toggling requires Firefox to be restarted, for which a restart now -button is provided.
+At runtime, individual scripts can be toggled on/off from menubar -> tools -> userScripts. Note that toggling requires Firefox to be restarted, for which a "restart now" -button is provided. The button clears startup-cache so you don't need to worry about that.
 
 A global preference to toggle all scripts is `userChromeJS.enabled`. This will disable all scripts but leaves the restart-button in the custom menu available.
 
@@ -61,11 +66,11 @@ Some convenience functions are provided for scripts to use in global `_ucUtils` 
 
 ## General
 
-### _ucUtils.createElement(document,tagname,attributes) -> xulElement
+### _ucUtils.createElement(document,tagname,attributes,isHTML) -> Element
 
     _ucUtils.createElement(document,"menuitem",{ id:"someid", class:"aClass", label:"some label" })
 
-Attaches a new XUL element with tagname to the given document and adds it attributes from attributes object.
+Attaches a new element with tagname to the given document and adds it attributes from attributes object. isHTML is a boolean indicating whether the element is XUL element or HTML element - defaults to false.
 
 ### _ucUtils.getScriptdata() -> Array
 
@@ -76,11 +81,19 @@ Attaches a new XUL element with tagname to the given document and adds it attrib
  
 Returns the currently loaded script files with their metadata
 
-### _ucUtils.getWindows(onlyBrowsers) -> Array
+### _ucUtils.windows -> Object
 
-    _ucUtils.getWindows(true)
+Returns an object to interact with windows with two properties
 
-Return a list of handles for each window for this firefox.exe. If onlyBrowsers is false then this only includes browser windows (not consoles or similar)
+#### _ucUtils.windows.get(onlyBrowsers) -> Array
+
+Return a list of handles for each window for this firefox instance. If onlyBrowsers is false then this only includes browser windows (not consoles or similar). onlyBrowsers defaults to `true`.
+
+#### _ucUtils.windows.forEach(function,onlyBrowsers)
+
+    _ucUtils.windows.forEach((document,window) => console.log(document.location), false)
+
+Runs the specified function for each window. The function will be given two arguments - reference to the document of the window and reference to the window object itself.
 
 ### _ucUtils.toggleScript(fileName or element)
 
@@ -128,6 +141,14 @@ Note that the callback will be invoked when any pref that starts with `userChrom
 
 Scripts should generally use the `resources` folder for their files. The helper functions interacting with filesystem expect `resources` to be the root folder for script operations.
 
+The resources folder is registered to chrome:// scheme so scripts and stylesheets can use the following URL to access files within it:
+
+    "chrome://userChrome/content/<filename>.txt" 
+
+Scripts folder is registered to: `chrome://userScripts/content/`
+
+The loader module folder is registered to `chrome://userchromejs/content/`
+
 ### _ucUtils.getFSEntry(fileName) -> fileHandle || enumerator for entries in a folder
 
 Get file handle for resources/some.txt:
@@ -167,3 +188,29 @@ Return an object with two properties
       let nextFile = entries.getNext().QueryInterface(Ci.nsIFile);
       console.log(nextFile.leafName);
     }
+
+## Shared global object
+
+If scripts need to store information to a global object they can get reference to that as follows:
+
+    let global = _ucUtils.sharedGlobal
+
+The information in the global object is available for all scripts
+
+## Startup directive
+
+Scripts can define a function to be executed when they are loaded in the header portion of the script. Consider the following header:
+
+    // ==UserScript==
+    // @name            My Test Script
+    // @startup         myScriptObject
+    
+This tells the loader to execute a special function named `_startup` from `globalShared.myScriptObject`. The _startup function will receive one argument - reference to the window object where it was executed.
+
+In short, to use startup directive you need to store an object named `myScriptObject` to the globalShared object and the myScriptObject must have a property called `_startup`.
+
+    _ucUtils.sharedGlobal.myScriptObject = {
+      _startup: function(win){ console.log(win.location) }
+    }
+
+**NOTE** This is behavior is completely incompatible with the way old userscripts implement startup - which generally was of form `eval(<whatever_is_in_header_startup>)`
