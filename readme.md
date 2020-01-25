@@ -95,6 +95,8 @@ Return a list of handles for each window for this firefox instance. If onlyBrows
 
 Runs the specified function for each window. The function will be given two arguments - reference to the document of the window and reference to the window object itself.
 
+**Note!** `_ucUtils` may not be available on all target window objects if onlyBrowsers is `false`. The callback funcion should check for it's availability when called that way.
+
 ### _ucUtils.toggleScript(fileName or element)
 
 filename:
