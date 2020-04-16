@@ -74,6 +74,7 @@ Attaches a new element with tagname to the given document and adds it attributes
 
 ### _ucUtils.registerHotkey(details,function) -> Boolean
 
+    // description for hotkey Ctrl + Shift + G
     let details = {
       id: "myHotkey",
       modifiers: "ctrl shift",
@@ -88,9 +89,9 @@ Attaches a new element with tagname to the given document and adds it attributes
     
     let success = _ucUtils.registerHotkey(details,onHotkey);
  
- Register a hotkey handler to each browser window. *details* object must have the  registerHotkey returns `true` if the hotkey was registered correctly. `false` if there was a problem. 
+ Register a hotkey handler to each browser window. registerHotkey returns `true` if the hotkey was registered correctly. `false` if there was a problem. 
  
- The function only supports modifiers `"alt"`, `"shift"`, `"ctrl"`, `"meta"`, `"accel"` and single character string as `key`. Thus a `key` with value `ArrowDown` will be treated as `A`
+ The function only supports modifiers `"alt"`, `"shift"`, `"ctrl"`, `"meta"`, `"accel"` and single character string as `key`. A `key` with value `ArrowDown` will be treated as `A`.
 
 The id field in the details object should have some unique value, but this is not enforced.
 
