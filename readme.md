@@ -72,6 +72,29 @@ Some convenience functions are provided for scripts to use in global `_ucUtils` 
 
 Attaches a new element with tagname to the given document and adds it attributes from attributes object. isHTML is a boolean indicating whether the element is XUL element or HTML element - defaults to false.
 
+### _ucUtils.registerHotkey(details,function) -> Boolean
+
+    let details = {
+      id: "myHotkey",
+      modifiers: "ctrl shift",
+      key: "G"
+    }
+    
+    function onHotkey(window,hotkey){
+      console.log(hotkey);
+      // prints id, modifiers and key of the pressed hotkey.
+      // window is the window-object that captured this hotkey
+    }
+    
+    let success = _ucUtils.registerHotkey(details,onHotkey);
+ 
+ Register a hotkey handler to each browser window. *details* object must have the  registerHotkey returns `true` if the hotkey was registered correctly. `false` if there was a problem. 
+ 
+ The function only supports modifiers `"alt"`, `"shift"`, `"ctrl"`, `"meta"`, `"accel"` and single character string as `key`. Thus a `key` with value `ArrowDown` will be treated as `A`
+
+The id field in the details object should have some unique value, but this is not enforced.
+
+
 ### _ucUtils.getScriptdata() -> Array
 
     let scripts = _ucUtils.getScriptdata();
