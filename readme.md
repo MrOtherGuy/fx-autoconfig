@@ -113,6 +113,15 @@ If the argument is an element the function reads a `filename` attribute from the
 
 Immediately restart the browser. If the boolean clearCache is true then Firefox will invalidate startupCache which allows changes to the enabled scripts to take effect.
 
+### _ucUtils.startupFinished() -> Promise
+
+    _ucUtils.startupFinished()
+    .then(()=>{
+      console.log("startup done");
+    });
+    
+Returns a promise that will be resolved when the browser has completed startup. This corresponds to `browser-delayed-startup-finished` event. Note that extension-engine initialization code may or may not have run when this promise resolves. 
+
 ## Prefs
 
 A shortcut for reading and writing preferences
