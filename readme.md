@@ -89,9 +89,13 @@ Attaches a new element with tagname to the given document and adds it attributes
     
     let success = _ucUtils.registerHotkey(details,onHotkey);
  
- Register a hotkey handler to each browser window. registerHotkey returns `true` if the hotkey was registered correctly. `false` if there was a problem. 
- 
- The function only supports modifiers `"alt"`, `"shift"`, `"ctrl"`, `"meta"`, `"accel"` and single character string as `key`. A `key` with value `ArrowDown` will be treated as `A`.
+Register a hotkey handler to each browser window. registerHotkey returns `true` if the hotkey was registered correctly. `false` if there was a problem. 
+`id`,`modifiers` and `key` fields are mandatory and must be String type.
+
+The function only supports modifiers `"alt"`, `"shift"`, `"ctrl"`, `"meta"` and `"accel"` modifiers.
+Valid key values are `A-Z` `a-z` `-` and function keys `F1`-`F12`.
+
+This function cannot create hotkeys with this that would override Firefox built-in hotkeys (not yet at least).
 
 The id field in the details object should have some unique value, but this is not enforced.
 
