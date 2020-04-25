@@ -1,6 +1,6 @@
 # Yet another userChrome.js manager
 
-The files in this repository create a toolkit to load arbitrary javascript files to be run in Firefox browser context. This method relies on autoconfig functionality available in pre-release versions of Firefox.
+The files in this repository create a toolkit to load arbitrary javascript files to be run in Firefox browser context. This method relies on autoconfig functionality available in Firefox.
 
 # Overview
 
@@ -20,10 +20,6 @@ Please note that malicious external programs can now inject custom logic to Fire
 
 Copy the *contents* of the folder "program" (not the folder itself) to the program folder you want the changes to apply to.
 That means the `config.js` should end up to the same folder where `firefox.exe` is located
-
-### Note for Release and Beta versions
-
-Firefox will ignore the config.js file in release and beta versions. You will need either Developer Edition or Nightly (unbranded build should also work). Only some functions in config.js are permitted in Release and Beta but the Components object that we require is not available.
 
 ## Setting up profile
 
