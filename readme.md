@@ -58,6 +58,10 @@ A global preference to toggle all scripts is `userChromeJS.enabled`. This will d
 
 This manager is NOT entirely compatible with all existing userScripts - specifically scripts that expect a global _uc object or something similar to be available.
 
+# Script scope
+
+Each script normally runs once *per window* when it is created. This can be changed with `@onlyonce` header in which case the script will only be run in the first window.
+
 Some convenience functions are provided for scripts to use in global `_ucUtils` object.
 
 ## General
@@ -144,7 +148,20 @@ Immediately restart the browser. If the boolean clearCache is true then Firefox 
       console.log("startup done");
     });
     
-Returns a promise that will be resolved when the browser has completed startup. This corresponds to `browser-delayed-startup-finished` event. Note that extension-engine initialization code may or may not have run when this promise resolves. 
+Returns a promise that will be resolved when all windows have been restored during session startup. If all windows have already been restored at the time of calling the promise will be resolved immediately.
+
+### _ucUtils.windowIsReady() -> Promise
+
+    _ucUtils.windowIsReady(window)
+    .then(()=>{
+      console.log("this window has finished starting up");
+    });
+
+ This corresponds to `browser-delayed-startup-finished` event. Note that extension-engine initialization code may or may not have run when this promise resolves. 
+
+### Difference of startupFinished and windowIsReady
+
+Since scripts run per window, `startupFinished` will be resolved once in *each window that called it* when ALL those windows have been restored. But `windowIsReady` will be resolved whenever the particular window that calls it has started up.
 
 ## Prefs
 
