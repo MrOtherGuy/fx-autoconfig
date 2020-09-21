@@ -137,6 +137,20 @@ Element where `this` is a menuitem:
 
 If the argument is an element the function reads a `filename` attribute from the element and uses that. Toggles the specified script, note that browser restart is required for changes to take effect.
 
+### _ucUtils.loadURI(window,details) -> boolean
+
+    _ucUtils.loadURI(window,{
+      url:"about:config",
+      where:"tab",        // one of ["current","tab","tabshifted","window"]
+      private: true,      // should the window be private
+      userContextId: 2    // numeric identifier for container
+    });
+    
+    // "tabshifted" means background tab but it does not work for unknown reasons
+    // Private tabs cannot be created in non-private windows
+
+Return a boolean indicating if the operation was successful. "url" and "where" properties are mandatory - others are optional. 
+
 ### _ucUtils.restart(clearCache)
 
 Immediately restart the browser. If the boolean clearCache is true then Firefox will invalidate startupCache which allows changes to the enabled scripts to take effect.
