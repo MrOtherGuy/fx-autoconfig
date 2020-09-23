@@ -72,6 +72,37 @@ Some convenience functions are provided for scripts to use in global `_ucUtils` 
 
 Attaches a new element with tagname to the given document and adds it attributes from attributes object. isHTML is a boolean indicating whether the element is XUL element or HTML element - defaults to false.
 
+### _ucUtils.createWidget(details) -> <Widget wrapper object> (or null on failure)
+
+    _ucUtils.createWidget({
+      id: "funk-item",                // required
+      type: "toolbaritem",            // ["toolbaritem","toolbarbutton"]  
+      label: "funky2",                // opt (uses id when missing)
+      tooltip: "noiseButton",         // opt (uses id when missing)
+      class: "noiseButton",           // opt additional className (see below for more)
+      image: "favicon.png",           // opt image filename from resources folder
+      style: "width:30px;",           // opt additional css-text (see below for more)
+      allEvents: true,                // opt trigger on all clicks (default false)
+      callback: function(ev,win){     // Function to be called when the item is clicked
+        console.log(ev.target.id)
+      }
+    })
+
+Widget is a wrapper for actual elements. Firefox tracks widget placements *across windows* meaning that you can create the widget once and then you can re-position it using customize mode and its new location will be shared in all windows. The wrapper contains information about the instances of that widget in windows.
+
+The **class** of elements using this will by default be "toolbarbutton-1 chromeclass-toolbar-additional" and the value of the class property (when provided) will be added into that.
+
+The **style** info will be added as inline style to all elements of that widget. The image will be loaded as centered background-image in toolbaritems and as list-style-image in toolbarbuttons.
+
+The **callback** function will be stored in _ucUtils.sharedGlobal mapped to the provided id. Clicking the button will call the callback which will receive two arguments: **event** (click) and **window** which is a reference to the window object where that instance of the widget is.
+
+If the callback property is not a function, then the widget will be just a passive element.
+
+The **allEvents** property defines if the callback should be called for all clicks, not just left-clicks.
+
+The **image** is loaded from `resources` folder so save your icon files there.
+
+
 ### _ucUtils.registerHotkey(details,function) -> Boolean
 
     // description for hotkey Ctrl + Shift + G
