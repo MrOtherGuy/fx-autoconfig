@@ -60,9 +60,31 @@ This manager is NOT entirely compatible with all existing userScripts - specific
 
 # Script scope
 
-Each script normally runs once *per window* when it is created. This can be changed with `@onlyonce` header in which case the script will only be run in the first window.
+Each script normally runs once *per window* when it is created. This can be changed with `@onlyonce` header in which case the script will only be run in the first window. 
 
-Some convenience functions are provided for scripts to use in global `_ucUtils` object.
+In addition, scripts can be marked as `@backgroundmodule` in which case they are executed "outside" of window when the the loader reads the file. See **backgroundmodule** section below.
+
+Some convenience functions are provided for scripts to use in global `_ucUtils` object available in windows.
+
+## backgroundmodule
+
+Scripts can be marked as background modules by including a `@backgroundmodule` line in script header. See example:
+
+```js
+// ==UserScript==
+// @name           example background module
+// @note           Loading as background module
+// @backgroundmodule
+// ==/UserScript==
+
+let EXPORTED_SYMBOLS = [];
+...
+// actual script here
+
+```
+Note that the `EXPORTED_SYMBOLS` array in module global scope is mandatory.
+
+You should note that background modules do not have access to window objects when they are being run because they are executed before any window exists. They also do not get access to `_ucUtils` object.
 
 ## General
 
