@@ -1,0 +1,83 @@
+/* This example style is loaded as agent sheet. That means it will affect every document that is loaded including web sites so you really want to constrain your styles to apply only where you want. Thus, the default namespace is set to xul to make rules apply to xul elements. Should you want to apply rules to html elements, you need to use the namespace selector like: html|input */
+
+/* Default to xul namespace */
+@namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
+
+/* Allow selecting html elements with named namespace selector */
+@namespace html url("http://www.w3.org/1999/xhtml");
+
+/* Demonstrates namespace selector - this would only affect tooltip elements that are html elements. But those don't exist so this does nothing. If you remove the "html|" prefix, then all your tooltips will be black */
+html|tooltip {
+  -moz-appearance: none;
+  background-color: rgb(15, 17, 34);
+  color: rgba(255, 255, 255, 1);
+  border: none;
+  padding: 5px;
+}
+
+/* Source file https://github.com/MrOtherGuy/firefox-csshacks/tree/master/chrome/overlay_scrollbars.as.css made available under Mozilla Public License v. 2.0
+See the above repository for updates as well as full license text. */
+
+/* This is supposed to be loaded as a agent sheet via autoconfig */
+/* It will not work otherwise and might do unexpected things */
+
+
+scrollbar {
+  -moz-appearance: none!important;
+  position: relative!important;
+  background-color: transparent;
+  z-index: 9;
+}
+scrollbar thumb{
+  -moz-appearance: none!important;
+  background-color: transparent;
+  pointer-events: auto;
+  opacity: 0.5;
+  transition: opacity 0.1s ease-in;
+}
+
+scrollbar[orient = "vertical"] thumb{
+  border-image-source: linear-gradient(to right, transparent 12px, black 14px);
+  border-image-width: 0 0 0 16px;
+  border-image-slice: 0% 0% 0% 100%;
+  border-image-repeat: stretch;
+}
+scrollbar[orient = "horizontal"] thumb{
+  border-image-source: linear-gradient(to bottom, transparent 12px, black 14px);
+  border-image-width: 16px 0 0 0;
+  border-image-slice: 100% 0% 0% 0%;
+  border-image-repeat: stretch;
+}
+
+scrollbar gripper,
+scrollbar scrollbarbutton{
+  display: none;
+}
+scrollbar[orient = "vertical"] {
+  min-width: 16px!important;
+  -moz-margin-start: -16px;/*margin to fill the whole render window with content and overlay the scrollbars*/
+}
+scrollbar[orient = "horizontal"] {
+  height: 16px!important;
+  margin-top: -16px;
+}
+scrollbar[orient = "vertical"] thumb{
+  border-right: 16px solid rgba(133, 132, 131, 1);
+  width: 16px;
+  min-height: 16px;
+}
+scrollbar[orient = "horizontal"] thumb{
+  border-bottom: 16px solid rgba(133, 132, 131, 1);
+  min-width: 16px !important;
+}
+scrollbar:hover {
+  background-color: rgba(0, 0, 0, 0.25);
+}
+scrollbar:hover thumb{ opacity: 1; }
+scrollbar:hover thumb{ border-image: none !important; }
+
+select > scrollbar,
+select > scrollbar > thumb{
+  -moz-appearance: initial !important;
+  -moz-margin-start: 0px !important
+}
