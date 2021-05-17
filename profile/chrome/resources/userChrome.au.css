@@ -1,5 +1,3 @@
-/* This example style is loaded globally as author sheet. That means it will affect every document that is loaded including web sites so you really want to constrain your styles to apply only where you want. Thus, the default namespace is set to xul to make rules apply to xul elements. Should you want to apply rules to html elements, you need to use the namespace selector like: html|input */
-
 /* This example file is supposed to be loaded as author style sheet. Notice that we can use ::part() ::host() etc. selectors here while they are unavailable in user stylesheets. */
 
 /* Default to xul namespace */
