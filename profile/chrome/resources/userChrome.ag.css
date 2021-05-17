@@ -1,4 +1,4 @@
-/* This example style is loaded as agent sheet. That means it will affect every document that is loaded including web sites so you really want to constrain your styles to apply only where you want. Thus, the default namespace is set to xul to make rules apply to xul elements. Should you want to apply rules to html elements, you need to use the namespace selector like: html|input */
+/* This example style is loaded globally as agent sheet. That means it will affect every document that is loaded including web sites so you really want to constrain your styles to apply only where you want. Thus, the default namespace is set to xul to make rules apply to xul elements. Should you want to apply rules to html elements, you need to use the namespace selector like: html|input */
 
 /* Default to xul namespace */
 @namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
