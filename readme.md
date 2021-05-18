@@ -60,9 +60,41 @@ This manager is NOT entirely compatible with all existing userScripts - specific
 
 # Script scope
 
-Each script normally runs once *per window* when it is created. This can be changed with `@onlyonce` header in which case the script will only be run in the first window. 
+Each script normally runs once *per document* when the document is loaded. This can be changed with `@onlyonce` header in which case the script will only be run in the first document. A window is a document, but a window may contain several "sub-documents" - kind of like iframes on web pages.
 
-In addition, scripts can be marked as `@backgroundmodule` in which case they are executed "outside" of window when the the loader reads the file. See **backgroundmodule** section below.
+## @include & @exclude
+
+By default, the loader executes your script only in the main browser window document. Using any @include header will override the default - for example:
+
+```js
+// ==UserScript==
+// @include           chrome://browser/content/places/places.xhtml
+// ==/UserScript==
+```
+
+The above would be executed only in the Library window.
+
+```js
+// ==UserScript==
+// @include           main
+// @include           chrome://browser/content/places/places.xhtml
+// ==/UserScript==
+```
+
+This would execute in both library and main window. "main" is an alias for `chrome://browser/content/browser.xhtml`.
+
+A wildcard `*` can be used to target any window.
+
+```js
+// ==UserScript==
+// @include           *
+// @exclude           main
+// ==/UserScript==
+```
+
+This would execute in all documents, excecpt main window - notice "main" is excluded this time.
+
+In addition, scripts can be marked as `@backgroundmodule` in which case they are executed "outside" of any document when the the loader reads the file. See **backgroundmodule** section below.
 
 Some convenience functions are provided for scripts to use in global `_ucUtils` object available in windows.
 
