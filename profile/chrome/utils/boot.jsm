@@ -120,8 +120,19 @@ let _uc = {
     if(!recentWindow){
       return false
     }
-    let entryFilePath = `file:///${entry.path.replaceAll("\\","/")}`;
+    
     let sheets = recentWindow.InspectorUtils.getAllStyleSheets(recentWindow.document,false);
+    sheets = sheets.flatMap(x => {
+      let a = [x];
+      let z = 0;
+      while(x.cssRules[z] instanceof CSSImportRule ){
+        a.push(x.cssRules[z++].styleSheet)
+      }
+      return a
+    });
+    
+    let entryFilePath = `file:///${entry.path.replaceAll("\\","/")}`;
+    
     let target = sheets.find(sheet => sheet.href === entryFilePath);
     if(target){
       recentWindow.InspectorUtils.parseStyleSheet(target,_uc.utils.readFile(entry));
