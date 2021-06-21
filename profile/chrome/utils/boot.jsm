@@ -120,17 +120,28 @@ let _uc = {
     if(!recentWindow){
       return false
     }
+    function recurseImports(sheet,all){
+      let z = 0;
+      let rule = sheet.cssRules[0];
+      // loop through import rules and check that the "all"
+      // doesn't already contain the same object
+      while(rule instanceof CSSImportRule && !all.includes(rule.styleSheet) ){
+        all.push(rule.styleSheet);
+        recurseImports(rule.styleSheet,all);
+        rule = sheet.cssRules[++z];
+      }
+      return all
+    }
     
     let sheets = recentWindow.InspectorUtils.getAllStyleSheets(recentWindow.document,false);
-    sheets = sheets.flatMap(x => {
-      let a = [x];
-      let z = 0;
-      while(x.cssRules[z] instanceof CSSImportRule ){
-        a.push(x.cssRules[z++].styleSheet)
-      }
-      return a
-    });
     
+    sheets = sheets.flatMap( x => recurseImports(x,[x]) );
+    
+    // If a sheet is imported multiple times, then there will be
+    // duplicates, because style system does create an object for
+    // each instace but that's OK since sheets.find below will
+    // only find the first instance and reload that which is
+    // "probably" fine.
     let entryFilePath = `file:///${entry.path.replaceAll("\\","/")}`;
     
     let target = sheets.find(sheet => sheet.href === entryFilePath);
