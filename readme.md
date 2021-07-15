@@ -58,6 +58,7 @@ The startup-cache folder can be found as follows:
 
 (Note) If you wish to set up a profile that doesn't use normal profile directories (i.e one that was lauched with command-line such as `firefox.exe -profile "C:\test\testprofile"` or with portable-apps launcher) then the startupCache folder will be in the profile root folder.
 </details>
+
 # Usage
 
 The file extension for your custom scripts must be `.uc.js`
