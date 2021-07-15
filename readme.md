@@ -33,17 +33,31 @@ There will be two files in the `chrome/utils/` folder:
 
 ## Deleting startup-cache
 
-Firefox caches some files to speed-up startup. But the files in utils/ modify the startup behavior so you might be required to manually delete the startup-cache.
+Firefox caches some files to speed-up startup. But the files in utils/ modify the startup behavior so you might be required to clear the startup-cache.
+
+If you modify boot.jsm and happen to break it, you will likely need to clear startup-cache again.
+
+<details>
+<summary>Clear startup-cache via about:support (recommended)</summary>
+
+0. Load `about:support`
+0. In the top-right corner should be a button to clear the startup-cache.
+0. Click that button and confirm the popup that will show up.
+0. Firefox will restart with startup-cache cleared, and now the scripts should be working.
+ 
+</details>
+<details>
+<summary>Clear startup-cache manually</summary>
 The startup-cache folder can be found as follows:
 
-1. load the following url `about:profiles`
-2. locate the profile you wish to set up and click the "Open Folder" of the **Local** directory - this should open the directory in File Manager
-3. Close Firefox
-4. Delete folder "StartupCache"
-5. Run Firefox
+0. load the following url `about:profiles`
+0. locate the profile you wish to set up and click the "Open Folder" of the **Local** directory - this should open the directory in File Manager
+0. Close Firefox
+0. Delete folder "StartupCache"
+0. Run Firefox
 
 (Note) If you wish to set up a profile that doesn't use normal profile directories (i.e one that was lauched with command-line such as `firefox.exe -profile "C:\test\testprofile"` or with portable-apps launcher) then the startupCache folder will be in the profile root folder.
-
+</details>
 # Usage
 
 The file extension for your custom scripts must be `.uc.js`
