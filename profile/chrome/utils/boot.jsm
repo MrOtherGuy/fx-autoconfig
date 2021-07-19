@@ -303,6 +303,7 @@ let _uc = {
           let props = {
             id: desc.id,
             class: `toolbarbutton-1 chromeclass-toolbar-additional ${desc.class?desc.class:""}`,
+            overflows: !!desc.overflows,
             label: desc.label || desc.id,
             tooltiptext: desc.tooltip || desc.id,
             style: itemStyle,
