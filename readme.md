@@ -16,12 +16,14 @@ Please note that malicious external programs can now inject custom logic to Fire
 
 # Install
 
-## Setting up program
+## Setting up config.js from "program" folder
 
-Copy the *contents* of the folder called "program" (not the folder itself) into the directory of the Firefox binary you want it to apply to. 
+Copy the *contents* of the directory called "program" (not the directory itself) into the directory of the Firefox binary you want it to apply to.
 
-<detail>
-<summaryWindows</summary>
+This means that if you want to affect multiple installations, like release, beta, ESR etc. you need to add the files to all of them.
+
+<details>
+<summary>Windows</summary>
 
 Firefox is typically installed to `C:\Program Files\Mozilla Firefox\`
 
