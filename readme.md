@@ -4,7 +4,7 @@ The files in this repository create a toolkit to load arbitrary javascript files
 
 # Overview
 
-Files in `program` folder tell Firefox to load an additional javascript module file from the current Profile directory. The `boot.jsm` is the one tha implements loading and managing additional files.
+Files in `program` folder tell Firefox to load an additional javascript module file from the current Profile directory. The `boot.jsm` is the one that implements loading and managing additional files.
 
 Since the files in `program` go to the main program installation path, they will affect all profiles that are being run using that executable.
 
@@ -44,6 +44,7 @@ Copy `defaults/` and `config.js` there from the `program` folder. `config.js` sh
 Unknown. Someone with mac should test how it goes.
 
 </details>
+
 ## Setting up profile
 
 Copy the contents of the folder "profile" (not the folder itself) to the Firefox profile folder that you want to modify. If the profile already has a `chrome` folder (for userChrome.css or userContent.css) then the chrome folders should merge. Otherwise the chrome folder will be created.
@@ -98,7 +99,7 @@ This manager is NOT entirely compatible with all existing userScripts - specific
 
 # Script scope
 
-Each script normally runs once *per document* when the document is loaded. This can be changed with `@onlyonce` header in which case the script will only be run in the first document. A window is a document, but a window may contain several "sub-documents" - kind of like iframes on web pages.
+Each script normally runs once *per document* when the document is loaded. A window is a document, but a window may contain several "sub-documents" - kind of like iframes on web pages.
 
 ## @include & @exclude
 
@@ -136,7 +137,21 @@ In addition, scripts can be marked as `@backgroundmodule` in which case they are
 
 Some convenience functions are provided for scripts to use in global `_ucUtils` object available in windows.
 
-## backgroundmodule
+## @onlyonce
+
+By default the script is executed once per document it applies to, but this can be changed with `@onlyonce` header in which case the script will only be run in the first document.
+
+```js
+// ==UserScript==
+// @name           example only-once file
+// @onlyonce
+// ==/UserScript==
+
+console.log("Hello world!") // This is only run in the first window that opens.
+
+```
+
+## @backgroundmodule
 
 Scripts can be marked as background modules by including a `@backgroundmodule` line in script header. See example:
 
