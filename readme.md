@@ -18,9 +18,30 @@ Please note that malicious external programs can now inject custom logic to Fire
 
 ## Setting up program
 
-Copy the *contents* of the folder "program" (not the folder itself) to the program folder you want the changes to apply to.
-That means the `config.js` should end up to the same folder where `firefox.exe` is located
+Copy the *contents* of the folder called "program" (not the folder itself) into the directory of the Firefox binary you want it to apply to. 
 
+<detail>
+<summaryWindows</summary>
+
+Firefox is typically installed to `C:\Program Files\Mozilla Firefox\`
+
+Copy `defaults/` and `config.js` there from the `program` folder. `config.js` should end up in the same directory where `firefox.exe` is.
+
+</details>
+<details>
+<summary>Linux</summary>
+
+Firefox is typically installed to `/usr/lib/firefox/` or `/usr/lib64/firefox/`
+
+Copy `defaults/` and `config.js` there from the `program` folder. `config.js` should end up in the same directory where `firefox` binary is.
+
+</details>
+<details>
+<summary>MacOS</summary>
+
+Unknown. Someone with mac should test how it goes.
+
+</details>
 ## Setting up profile
 
 Copy the contents of the folder "profile" (not the folder itself) to the Firefox profile folder that you want to modify. If the profile already has a `chrome` folder (for userChrome.css or userContent.css) then the chrome folders should merge. Otherwise the chrome folder will be created.
@@ -61,9 +82,9 @@ The startup-cache folder can be found as follows:
 
 # Usage
 
-The file extension for your custom scripts must be `.uc.js`
+The file extension for your custom scripts must be `.uc.js`, the loader script only looks for files with that extension.
 
-Just put any such files in the scripts folder inside chrome folder, same folder where userChrome.css would be. By default the scripts folder is named `JS` but this is customizable by modifying `chrome.manifest`. For example change `../JS/` to `../scripts/` to make Firefox load scripts from "scripts" folder.
+Just put any such files into the `JS` directory. The `JS` directory should be in the same directory where userChrome.css would be. If you wish to change the directory name then you need to modify the `chrome.manifest` file inside `utils` directory. For example change `../JS/` to `../scripts/` to make Firefox load scripts from "scripts" folder.
 
 At runtime, individual scripts can be toggled on/off from menubar -> tools -> userScripts. Note that toggling requires Firefox to be restarted, for which a "restart now" -button is provided. The button clears startup-cache so you don't need to worry about that.
 
