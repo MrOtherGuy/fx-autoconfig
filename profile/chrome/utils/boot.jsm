@@ -505,7 +505,7 @@ let _uc = {
           desc.url,
           desc.where,
           { "allowPopups":isJsURI,
-            "inBackground":desc.where==="tabshifted", // This doesn't work for some reason
+            "inBackground":false,
             "allowInheritPrincipal":false,
             "private":!!desc.private,
             "userContextId":desc.url.startsWith("http")?desc.userContextId:null});
