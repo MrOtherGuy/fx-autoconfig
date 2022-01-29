@@ -206,7 +206,6 @@ let _uc = {
       updateURL: (header.match(/\/\/ @updateURL\s+(.+)\s*$/im) || def)[1],
       optionsURL: (header.match(/\/\/ @optionsURL\s+(.+)\s*$/im) || def)[1],
       startup: (header.match(/\/\/ @startup\s+(.+)\s*$/im) || def)[1],
-      //shutdown: (header.match(/\/\/ @shutdown\s+(.+)\s*$/im) || def)[1],
       onlyonce: /\/\/ @onlyonce\b/.test(header),
       inbackground: /\/\/ @backgroundmodule\b/.test(header),
       isRunning: false,
@@ -215,8 +214,6 @@ let _uc = {
       }
     }
   },
-
-  //everLoaded: [],
   
   maybeRunStartUp: (script,win) => {
     if( script.startup
@@ -243,9 +240,6 @@ let _uc = {
       script.isRunning = true;
       _uc.maybeRunStartUp(script,win);
       
-      /*if (!script.shutdown) {
-        this.everLoaded.push(script.id);
-      }*/
     } catch (ex) {
       console.error(ex);
     }
