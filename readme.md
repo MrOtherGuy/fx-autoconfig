@@ -171,6 +171,28 @@ Note that the `EXPORTED_SYMBOLS` array in module global scope is mandatory.
 
 You should note that background modules do not have access to window objects when they are being run because they are executed before any window exists. They also do not get access to `_ucUtils` object.
 
+## @ignorecache
+
+This header can be used to mark scripts that should not be put into startup-cache. Instead, such scripts are always read from disk when loaded.
+
+```js
+// ==UserScript==
+// @name           example ignorecache file
+// @ignorecache
+// ==/UserScript==
+
+console.log("Hello world!")
+
+```
+
+This script would log "Hello world!" to console when new window is opened. Normally if you would change this script content and then open a new window, then Firefox would still log "Hello world!" because the script is cached. 
+
+However, by ignoring cache the file is loaded from disk every time its used, thus changes will be reflected immediately (but not for the window the script has already been loaded into).
+
+This header may be useful while developing a script, but you should leave caching enabled most of the time.
+
+**Note:** if your script has already been cached once, then you need to clear startup-cache once to make it ignore cache. In other words, you can't add this header to existing script to make it ignore cache immediately.
+
 ## General
 
 ### _ucUtils.createElement(document,tagname,attributes,isHTML) -> Element
