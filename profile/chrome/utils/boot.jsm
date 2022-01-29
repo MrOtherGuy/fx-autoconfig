@@ -208,6 +208,7 @@ let _uc = {
       startup: (header.match(/\/\/ @startup\s+(.+)\s*$/im) || def)[1],
       onlyonce: /\/\/ @onlyonce\b/.test(header),
       inbackground: /\/\/ @backgroundmodule\b/.test(header),
+      ignoreCache: /\/\/ @ignorecache\b/.test(header),
       isRunning: false,
       get isEnabled() {
         return (yPref.get(_uc.PREF_SCRIPTSDISABLED) || '').split(',').indexOf(this.filename) === -1;
@@ -235,7 +236,13 @@ let _uc = {
         return
       }
 
-      Services.scriptloader.loadSubScript(`chrome://userscripts/content/${script.filename}`, win);
+      Services.scriptloader.loadSubScriptWithOptions(
+        `chrome://userscripts/content/${script.filename}`,
+        {
+          target: win,
+          ignoreCache: script.ignoreCache
+        }
+      );
       
       script.isRunning = true;
       _uc.maybeRunStartUp(script,win);
