@@ -520,6 +520,43 @@ let _uc = {
     },
     get prefs(){ return yPref },
 
+    showNotification: async function(description){
+      await _uc.utils.startupFinished();
+      let window = description.window;
+      if(!(window && window.isChromeWindow)){
+        window = Services.wm.getMostRecentBrowserWindow();
+      }
+      let aNotificationBox = window.gNotificationBox;
+      if(description.tab){
+        let aBrowser = description.tab.linkedBrowser;
+        if(!aBrowser){ return }
+        aNotificationBox = window.gBrowser.getNotificationBox(aBrowser);
+      }
+      if(!aNotificationBox){ return }
+      let type = description.type || "default";
+      let priority = aNotificationBox.PRIORITY_INFO_HIGH;
+      switch (description.priority){
+        case "system":
+          priority = aNotificationBox.PRIORITY_SYSTEM;
+          break;
+        case "critical":
+          priority = aNotificationBox.PRIORITY_CRITICAL_HIGH;
+          break;
+        case "warning":
+          priority = aNotificationBox.PRIORITY_WARNING_HIGH;
+          break;
+      }
+      aNotificationBox.appendNotification(
+        type,
+        {
+          label: description.label || "ucUtils message",
+          image: "chrome://browser/skin/notification-icons/popup.svg",
+          priority: priority,
+        },
+        description.buttons
+      );
+    },
+
     restart: function (clearCache){
       clearCache && Services.appinfo.invalidateCachesOnRestart();
       let cancelQuit = Cc["@mozilla.org/supports-PRBool;1"].createInstance(Ci.nsISupportsPRBool);
@@ -561,7 +598,7 @@ UserChrome_js.prototype = {
     let regex = /^chrome:(?!\/\/global\/content\/(commonDialog|alerts\/alert)\.xhtml)|about:(?!blank)/i;
     // Don't inject scripts to modal prompt windows or notifications
     if(regex.test(window.location.href)) {
-      window._ucUtils = _uc.utils;
+      Object.defineProperty(window,"_ucUtils",{get: ()=>_uc.utils});
       document.allowUnsafeHTML = false; // https://bugzilla.mozilla.org/show_bug.cgi?id=1432966
       if(window._gBrowser){ // bug 1443849
         window.gBrowser = window._gBrowser;
