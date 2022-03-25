@@ -552,6 +552,7 @@ let _uc = {
           label: description.label || "ucUtils message",
           image: "chrome://browser/skin/notification-icons/popup.svg",
           priority: priority,
+          eventCallback: typeof description.callback === "function" ? description.callback : null
         },
         description.buttons
       );
