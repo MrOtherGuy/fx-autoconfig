@@ -339,6 +339,29 @@ Returns a promise that will be resolved when all windows have been restored duri
 
 Since scripts run per window, `startupFinished` will be resolved once in *each window that called it* when ALL those windows have been restored. But `windowIsReady` will be resolved whenever the particular window that calls it has started up.
 
+### _ucUtils.showNotification() -> Promise
+
+```js
+_ucUtils.showNotification(
+  {
+    label : "Message content",  // text shown in the notification
+    type : "something",         // opt identifier for this notification
+    priority: "info",           // opt one of ["system","critical","warning","info"]
+    window: window.top          // opt reference to a chromeWindow
+    tab: gBrowser.selectedTab,  // opt reference to a tab
+    buttons: [...]              // opt array of button descriptors
+    callback: () => {}          // opt function to be called when notification is dismissed
+  }
+)
+```
+Priority defines the ordering and coloring of this notification. Notifications of higher priority are shown before those of lower priority. Priority defaults to "info".
+
+If `window` key exists then the notification will be shown in that window. Otherwise it is shown in the last active window.
+
+If `tab` key exists then the notification will be shown in that tab only. Otherwise the notification is global to the window.
+
+See more about `buttons` and `callback` keys at [notificationbox.js](https://searchfox.org/mozilla-central/rev/3f782c2587124923a37c750b88c5a40108077057/toolkit/content/widgets/notificationbox.js#113)
+
 ## Prefs
 
 A shortcut for reading and writing preferences
