@@ -197,26 +197,30 @@ This header may be useful while developing a script, but you should leave cachin
 
 ### _ucUtils.createElement(document,tagname,attributes,isHTML) -> Element
 
-    _ucUtils.createElement(document,"menuitem",{ id:"someid", class:"aClass", label:"some label" })
+```js
+_ucUtils.createElement(document,"menuitem",{ id:"someid", class:"aClass", label:"some label" })
+```
 
 Attaches a new element with tagname to the given document and adds it attributes from attributes object. isHTML is a boolean indicating whether the element is XUL element or HTML element - defaults to false.
 
-### _ucUtils.createWidget(details) -> <Widget wrapper object> (or null on failure)
+### _ucUtils.createWidget(details) -> `<Widget wrapper object>` (or null on failure)
 
-    _ucUtils.createWidget({
-      id: "funk-item",                // required
-      type: "toolbaritem",            // ["toolbaritem","toolbarbutton"]  
-      label: "funky2",                // opt (uses id when missing)
-      tooltip: "noiseButton",         // opt (uses id when missing)
-      class: "noiseButton",           // opt additional className (see below for more)
-      image: "favicon.png",           // opt image filename from resources folder
-      style: "width:30px;",           // opt additional css-text (see below for more)
-      allEvents: true,                // opt trigger on all clicks (default false)
-      callback: function(ev,win){     // Function to be called when the item is clicked
-        console.log(ev.target.id)
-      }
-    })
+```js
+_ucUtils.createWidget({
+  id: "funk-item",                // required
+  type: "toolbaritem",            // ["toolbaritem","toolbarbutton"]  
+  label: "funky2",                // opt (uses id when missing)
+  tooltip: "noiseButton",         // opt (uses id when missing)
+  class: "noiseButton",           // opt additional className (see below for more)
+  image: "favicon.png",           // opt image filename from resources folder
+  style: "width:30px;",           // opt additional css-text (see below for more)
+  allEvents: true,                // opt trigger on all clicks (default false)
+  callback: function(ev,win){     // Function to be called when the item is clicked
+    console.log(ev.target.id)
+  }
+})
 
+```
 Widget is a wrapper for actual elements. Firefox tracks widget placements *across windows* meaning that you can create the widget once and then you can re-position it using customize mode and its new location will be shared in all windows. The wrapper contains information about the instances of that widget in windows.
 
 The **class** of elements using this will by default be "toolbarbutton-1 chromeclass-toolbar-additional" and the value of the class property (when provided) will be added into that.
@@ -234,21 +238,24 @@ The **image** is loaded from `resources` folder so save your icon files there.
 
 ### _ucUtils.registerHotkey(details,function) -> Boolean
 
-    // description for hotkey Ctrl + Shift + G
-    let details = {
-      id: "myHotkey",
-      modifiers: "ctrl shift",
-      key: "G"
-    }
-    
-    function onHotkey(window,hotkey){
-      console.log(hotkey);
-      // prints id, modifiers and key of the pressed hotkey.
-      // window is the window-object that captured this hotkey
-    }
-    
-    let success = _ucUtils.registerHotkey(details,onHotkey);
- 
+```js
+// description for hotkey Ctrl + Shift + G
+let details = {
+  id: "myHotkey",
+  modifiers: "ctrl shift",
+  key: "G"
+}
+
+function onHotkey(window,hotkey){
+  console.log(hotkey);
+  // prints id, modifiers and key of the pressed hotkey.
+  // window is the window-object that captured this hotkey
+}
+
+let success = _ucUtils.registerHotkey(details,onHotkey);
+
+```
+
 Register a hotkey handler to each browser window. registerHotkey returns `true` if the hotkey was registered correctly. `false` if there was a problem. 
 `id`,`modifiers` and `key` fields are mandatory and must be String type.
 
@@ -262,11 +269,13 @@ The id field in the details object should have some unique value, but this is no
 
 ### _ucUtils.getScriptdata() -> Array
 
-    let scripts = _ucUtils.getScriptdata();
-    for(let script of scripts){
-      console.log(`${script.filename} - ${script.isRunning})
-    }
- 
+```js
+let scripts = _ucUtils.getScriptdata();
+for(let script of scripts){
+  console.log(`${script.filename} - ${script.isRunning})
+}
+```
+
 Returns the currently loaded script files with their metadata
 
 ### _ucUtils.windows -> Object
@@ -281,7 +290,9 @@ Return a list of handles for each window object for this firefox instance. If `o
 
 #### _ucUtils.windows.forEach(function,onlyBrowsers)
 
-    _ucUtils.windows.forEach((document,window) => console.log(document.location), false)
+```js
+_ucUtils.windows.forEach((document,window) => console.log(document.location), false)
+```
 
 Runs the specified function for each window. The function will be given two arguments - reference to the document of the window and reference to the window object itself.
 
@@ -291,25 +302,31 @@ Runs the specified function for each window. The function will be given two argu
 
 filename:
 
-    _ucUtils.toggleScript("test.uc.js")
+```js
+_ucUtils.toggleScript("test.uc.js")
+```
 
 Element where `this` is a menuitem:
 
-    _ucUtils.toggleScript(this);
+```js
+_ucUtils.toggleScript(this);
+```
 
 If the argument is an element the function reads a `filename` attribute from the element and uses that. Toggles the specified script, note that browser restart is required for changes to take effect.
 
 ### _ucUtils.loadURI(window,details) -> boolean
 
-    _ucUtils.loadURI(window,{
-      url:"about:config",
-      where:"tab",        // one of ["current","tab","tabshifted","window"]
-      private: true,      // should the window be private
-      userContextId: 2    // numeric identifier for container
-    });
-    
-    // "tabshifted" means background tab but it does not work for unknown reasons
-    // Private tabs cannot be created in non-private windows
+```js
+_ucUtils.loadURI(window,{
+  url:"about:config",
+  where:"tab",        // one of ["current","tab","tabshifted","window"]
+  private: true,      // should the window be private
+  userContextId: 2    // numeric identifier for container
+});
+
+// "tabshifted" means background tab but it does not work for unknown reasons
+// Private tabs cannot be created in non-private windows
+```
 
 Return a boolean indicating if the operation was successful. "url" and "where" properties are mandatory - others are optional. 
 
@@ -319,19 +336,23 @@ Immediately restart the browser. If the boolean clearCache is true then Firefox 
 
 ### _ucUtils.startupFinished() -> Promise
 
-    _ucUtils.startupFinished()
-    .then(()=>{
-      console.log("startup done");
-    });
-    
+```js
+_ucUtils.startupFinished()
+.then(()=>{
+  console.log("startup done");
+});
+```
+
 Returns a promise that will be resolved when all windows have been restored during session startup. If all windows have already been restored at the time of calling the promise will be resolved immediately.
 
 ### _ucUtils.windowIsReady() -> Promise
 
-    _ucUtils.windowIsReady(window)
-    .then(()=>{
-      console.log("this window has finished starting up");
-    });
+```js
+_ucUtils.windowIsReady(window)
+.then(()=>{
+  console.log("this window has finished starting up");
+});
+```
 
  This corresponds to `browser-delayed-startup-finished` event. Note that extension-engine initialization code may or may not have run when this promise resolves. 
 
@@ -368,8 +389,10 @@ A shortcut for reading and writing preferences
 
 ### _ucUtils.prefs.set(prefName,value) -> value
 
-    _ucUtils.prefs.set("some.pref.path","test");
-    _ucUtils.prefs.set("some.other.pref",300);
+```js
+_ucUtils.prefs.set("some.pref.path","test");
+_ucUtils.prefs.set("some.other.pref",300);
+```
 
 Returns a new value on success, undefined if pref couldn't be set
 
@@ -379,14 +402,18 @@ Returns the value of the pref, undefined if it doesn't exist
 
 ### _ucUtils.prefs.addListener(prefName,callback) -> Object
 
-    let callback = (value,pref) => (console.log(`${pref} changed to ${value}`))
-    let prefListener = _ucUtils.prefs.addListener("userChromeJS",callback);
+```js
+let callback = (value,pref) => (console.log(`${pref} changed to ${value}`))
+let prefListener = _ucUtils.prefs.addListener("userChromeJS",callback);
+```
 
 Note that the callback will be invoked when any pref that starts with `userChromeJS` is changed. The pref in callback argument will be the actual pref whose value changed.
 
 ### _ucUtils.prefs.removeListener(listener)
 
-    _ucUtils.prefs.removeListener(prefListener) // from above example
+```
+_ucUtils.prefs.removeListener(prefListener) // from above example
+```
 
 ## Filesystem
 
@@ -404,47 +431,59 @@ The loader module folder is registered to `chrome://userchromejs/content/`
 
 Get file handle for resources/some.txt:
 
-    let fileHandle = _ucUtils.getFSEntry("some.txt");
+```js
+let fileHandle = _ucUtils.getFSEntry("some.txt");
+```
 
 Loop through filesystem entries in resources/path:
 
-    let contents = _ucUtils.getFSEntry("path");
-    while(contents.hasMoreElements()){
-      let nextFile = contents.getNext().QueryInterface(Ci.nsIFile);
-      console.log(nextFile.leafName);
-    }
+```js
+let contents = _ucUtils.getFSEntry("path");
+while(contents.hasMoreElements()){
+  let nextFile = contents.getNext().QueryInterface(Ci.nsIFile);
+  console.log(nextFile.leafName);
+}
+```
 
 ### _ucUtils.readFile(fileHandle,metaOnly) -> String
 
-    _ucUtils.readFile(aFile,false)
+```js
+_ucUtils.readFile(aFile,false)
+```
 
 Attempts to read the content of the given fileHandle as text. Boolean metaOnly is used to parse only the metadata of userScripts when reading them from script directory.
 
 ### _ucUtils.createFileURI(fileName) -> String
 
-    _ucUtils.createFileURI("path\some.png")
+```js
+_ucUtils.createFileURI("path\some.png")
+```
 
 Return a valid file uri describing `<profileDir>\chrome\resources\path\some.png`
 
 ### _ucUtils.chromeDir
 
-Return an object with two properties
+Returns an object with two properties
 
-    _ucUtils.chromeDir.uri // a file:/// uri
-    
-    _ucUtils.chromeDir.files -> enumerator for entries in chrome folder
-    
-    let entries = _ucUtils.chromeDir.files;
-    while(entries.hasMoreElements()){
-      let nextFile = entries.getNext().QueryInterface(Ci.nsIFile);
-      console.log(nextFile.leafName);
-    }
+```js
+_ucUtils.chromeDir.uri // a file:/// uri
+
+_ucUtils.chromeDir.files -> enumerator for entries in chrome folder
+
+let entries = _ucUtils.chromeDir.files;
+while(entries.hasMoreElements()){
+  let nextFile = entries.getNext().QueryInterface(Ci.nsIFile);
+  console.log(nextFile.leafName);
+}
+```
 
 ## Shared global object
 
 If scripts need to store information to a global object they can get reference to that as follows:
 
-    let global = _ucUtils.sharedGlobal
+```js
+let global = _ucUtils.sharedGlobal
+```
 
 The information in the global object is available for all scripts
 
@@ -460,8 +499,10 @@ This tells the loader to execute a special function named `_startup` from `globa
 
 In short, to use startup directive you need to store an object named `myScriptObject` to the globalShared object and the myScriptObject must have a property called `_startup`.
 
-    _ucUtils.sharedGlobal.myScriptObject = {
-      _startup: function(win){ console.log(win.location) }
-    }
+```js
+_ucUtils.sharedGlobal.myScriptObject = {
+  _startup: function(win){ console.log(win.location) }
+}
+```
 
 **NOTE** This is behavior is completely incompatible with the way old userscripts implement startup - which generally was of form `eval(<whatever_is_in_header_startup>)`
