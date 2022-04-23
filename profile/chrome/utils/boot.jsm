@@ -173,6 +173,7 @@ let _uc = {
         }
       }
     }
+    this.scripts.sort((a,b) => a.loadOrder > b.loadOrder)
   },
 
   ScriptData: class {
@@ -212,6 +213,13 @@ let _uc = {
       }
       let exclude = rex.exclude.length ? `(?!${rex.exclude.join('$|')}$)` : '';
       this.regex = new RegExp(`^${exclude}(${rex.include.join('|') || '.*'})$`,'i');
+      
+      if(this.inbackground){
+        this.loadOrder = -1;
+      }else{
+        let loadOrder = headerText.match(/\/\/ @loadOrder\s+(\d+)\s*$/im)?.[1];
+        this.loadOrder = Number.parseInt(loadOrder) || 10;
+      }
       
       Object.seal(this);
     }
