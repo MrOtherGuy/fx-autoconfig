@@ -625,9 +625,7 @@ UserChrome_js.prototype = {
     if(regex.test(window.location.href)) {
       Object.defineProperty(window,"_ucUtils",{get: ()=>_uc.utils});
       document.allowUnsafeHTML = false; // https://bugzilla.mozilla.org/show_bug.cgi?id=1432966
-      if(window._gBrowser){ // bug 1443849
-        window.gBrowser = window._gBrowser;
-      }
+
       let isWindow = window.isChromeWindow;
       
       // Inject scripts to window
