@@ -193,6 +193,24 @@ This header may be useful while developing a script, but you should leave cachin
 
 **Note:** if your script has already been cached once, then you need to clear startup-cache once to make it ignore cache. In other words, you can't add this header to existing script to make it ignore cache immediately.
 
+## @loadOrder
+
+```js
+// ==UserScript==
+// @name           example
+// @loadOrder      3
+// ==/UserScript==
+
+console.log("This script is loaded sooner than default")
+```
+
+Load-order is treated as positive integer (including 0)
+By default scripts have load-order `10`. Scripts with load-order <10 are injected before unmarked scripts and >10 are loaded after them.
+
+If load-order is not specified then scripts follow normal filename alphabetical ordering.
+
+Note: All Scripts marked as `backgroundmodule` will have load-order `-1`
+
 ## General
 
 ### _ucUtils.createElement(document,tagname,attributes,isHTML) -> Element
@@ -276,7 +294,7 @@ for(let script of scripts){
 }
 ```
 
-Returns the currently loaded script files with their metadata
+Returns the currently loaded script files with a copy of their metadata.
 
 ### _ucUtils.windows -> Object
 
@@ -298,7 +316,7 @@ Runs the specified function for each window. The function will be given two argu
 
 **Note!** `_ucUtils` may not be available on all target window objects if onlyBrowsers is `false`. The callback function should check for it's availability when called that way.
 
-### _ucUtils.toggleScript(fileName or element)
+### _ucUtils.toggleScript(fileName or element) -> Object or null
 
 filename:
 
@@ -313,6 +331,8 @@ _ucUtils.toggleScript(this);
 ```
 
 If the argument is an element the function reads a `filename` attribute from the element and uses that. Toggles the specified script, note that browser restart is required for changes to take effect.
+
+The return value is `null` if a matching script was not found. Otherwise, the return value is an object `{ script: filename, enabled: true|false }`
 
 ### _ucUtils.loadURI(window,details) -> boolean
 
@@ -360,7 +380,7 @@ _ucUtils.windowIsReady(window)
 
 Since scripts run per window, `startupFinished` will be resolved once in *each window that called it* when ALL those windows have been restored. But `windowIsReady` will be resolved whenever the particular window that calls it has started up.
 
-### _ucUtils.showNotification() -> Promise
+### _ucUtils.showNotification(details) -> Promise
 
 ```js
 _ucUtils.showNotification(
