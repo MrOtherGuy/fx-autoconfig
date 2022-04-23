@@ -153,7 +153,7 @@ let _uc = {
   },
 
   getScripts: function () {
-    this.scripts = {};
+    this.scripts = [];
     if(!yPref.get(_uc.PREF_ENABLED) || !(/^[\w_]*$/.test(_uc.SCRIPT_DIR))){
       console.log("Scripts are disabled or the given script directory name is invalid");
       return
@@ -162,57 +162,74 @@ let _uc = {
     while(files.hasMoreElements()){
       let file = files.getNext().QueryInterface(Ci.nsIFile);
       if (/\.uc\.js$/i.test(file.leafName)) {
-        let script = _uc.getScriptData(file);
+        let script = _uc.ScriptData.fromFile(file);
+        this.scripts.push(script);
         if(script.inbackground && script.isEnabled){
           try{
             Cu.import(`chrome://userscripts/content/${script.filename}`)
           }catch(e){
             console.error(e);
+          }
         }
-      }
       }
     }
   },
 
-  getScriptData: function (aFile) {
-    let header = (_uc.utils.readFile(aFile,true).match(/^\/\/ ==UserScript==\s*\n(?:.*\n)*?\/\/ ==\/UserScript==\s*\n/m) || [''])[0];
-    let match, rex = {
-      include: [],
-      exclude: []
-    };
-    let findNextRe = /^\/\/ @(include|exclude)\s+(.+)\s*$/gm;
-    while ((match = findNextRe.exec(header))) {
-      rex[match[1]].push(match[2].replace(/^main$/i, _uc.BROWSERCHROME).replace(/\*/g, '.*?'));
-    }
-    if (!rex.include.length) {
-      rex.include.push(_uc.BROWSERCHROME);
-    }
-    let exclude = rex.exclude.length ? `(?!${rex.exclude.join('$|')}$)` : '';
-    let def = ['', ''];
-    let author = (header.match(/\/\/ @author\s+(.+)\s*$/im) || def)[1];
-    let filename = aFile.leafName || '';
-
-    return this.scripts[filename] = {
-      filename: filename,
-      name: (header.match(/\/\/ @name\s+(.+)\s*$/im) || def)[1],
-      charset: (header.match(/\/\/ @charset\s+(.+)\s*$/im) || def)[1],
-      description: (header.match(/\/\/ @description\s+(.+)\s*$/im) || def)[1],
-      version: (header.match(/\/\/ @version\s+(.+)\s*$/im) || def)[1],
-      author: (header.match(/\/\/ @author\s+(.+)\s*$/im) || def)[1],
-      regex: new RegExp(`^${exclude}(${rex.include.join('|') || '.*'})$`,'i'),
-      id: (header.match(/\/\/ @id\s+(.+)\s*$/im) || ['', filename.split('.uc.js')[0] + '@' + (author || 'userChromeJS')])[1],
-      homepageURL: (header.match(/\/\/ @homepageURL\s+(.+)\s*$/im) || def)[1],
-      downloadURL: (header.match(/\/\/ @downloadURL\s+(.+)\s*$/im) || def)[1],
-      updateURL: (header.match(/\/\/ @updateURL\s+(.+)\s*$/im) || def)[1],
-      optionsURL: (header.match(/\/\/ @optionsURL\s+(.+)\s*$/im) || def)[1],
-      startup: (header.match(/\/\/ @startup\s+(.+)\s*$/im) || def)[1],
-      onlyonce: /\/\/ @onlyonce\b/.test(header),
-      inbackground: /\/\/ @backgroundmodule\b/.test(header),
-      ignoreCache: /\/\/ @ignorecache\b/.test(header),
-      isRunning: false,
-      get isEnabled() {
-        return (yPref.get(_uc.PREF_SCRIPTSDISABLED) || '').split(',').indexOf(this.filename) === -1;
+  ScriptData: class {
+    constructor(leafName, headerText){
+      this.filename = leafName;
+      this.name = headerText.match(/\/\/ @name\s+(.+)\s*$/im)?.[1];
+      this.charset = headerText.match(/\/\/ @charset\s+(.+)\s*$/im)?.[1];
+      this.description = headerText.match(/\/\/ @description\s+(.+)\s*$/im)?.[1];
+      this.version = headerText.match(/\/\/ @version\s+(.+)\s*$/im)?.[1];
+      this.author = headerText.match(/\/\/ @author\s+(.+)\s*$/im)?.[1];
+      this.homepageURL = headerText.match(/\/\/ @homepageURL\s+(.+)\s*$/im)?.[1];
+      this.downloadURL = headerText.match(/\/\/ @downloadURL\s+(.+)\s*$/im)?.[1];
+      this.updateURL = headerText.match(/\/\/ @updateURL\s+(.+)\s*$/im)?.[1];
+      this.optionsURL = headerText.match(/\/\/ @optionsURL\s+(.+)\s*$/im)?.[1];
+      this.startup = headerText.match(/\/\/ @startup\s+(.+)\s*$/im)?.[1];
+      this.id = headerText.match(/\/\/ @id\s+(.+)\s*$/im)?.[1]
+             || `${leafName.split('.uc.js')[0]}@${this.author||'userChromeJS'}`;
+      
+      this.onlyonce = /\/\/ @onlyonce\b/.test(headerText);
+      this.inbackground = /\/\/ @backgroundmodule\b/.test(headerText);
+      this.ignoreCache = /\/\/ @ignorecache\b/.test(headerText);
+      this.isRunning = false;
+      
+      // Construct regular expression to use to match target document
+      let match, rex = {
+        include: [],
+        exclude: []
+      };
+      let findNextRe = /^\/\/ @(include|exclude)\s+(.+)\s*$/gm;
+      while (match = findNextRe.exec(headerText)) {
+        rex[match[1]].push(
+          match[2].replace(/^main$/i, _uc.BROWSERCHROME).replace(/\*/g, '.*?')
+        );
       }
+      if (!rex.include.length) {
+        rex.include.push(_uc.BROWSERCHROME);
+      }
+      let exclude = rex.exclude.length ? `(?!${rex.exclude.join('$|')}$)` : '';
+      this.regex = new RegExp(`^${exclude}(${rex.include.join('|') || '.*'})$`,'i');
+      
+      Object.seal(this);
+    }
+    get isEnabled() {
+      return (yPref.get(_uc.PREF_SCRIPTSDISABLED) || '')
+             .split(',').indexOf(this.filename) === -1;
+    }
+    
+    getInfo(){
+      let info = {...this};
+      info.regex = new RegExp(this.regex.source,this.regex.flags);
+      return info;
+    }
+    
+    static fromFile(aFile){
+      const headerText = _uc.utils.readFile(aFile,true)
+      .match(/^\/\/ ==UserScript==\s*\n(?:.*\n)*?\/\/ ==\/UserScript==\s*\n/m);
+      return new _uc.ScriptData(aFile.leafName, headerText ? headerText[0] : '');
     }
   },
   
@@ -227,7 +244,7 @@ let _uc = {
   },
   
   loadScript: function (script, win) {
-    if (script.inbackground || !script.regex.test(win.location.href) || !script.isEnabled) {
+    if (script.inbackground || !script.regex.test(win.location.href)) {
       return
     }
     try {
@@ -353,15 +370,11 @@ let _uc = {
     
     getScriptData: () => {
       let scripts = [];
-      for(let script in _uc.scripts){
-        let data = {};
-        let o = _uc.scripts[script];
-        for(let p in o){
-          if(p != "isEnabled"){
-            data[p] = o[p];
-          }
-        }
-        scripts.push(data)
+      const disabledScripts = (yPref.get(_uc.PREF_SCRIPTSDISABLED) || '').split(",");
+      for(let script of _uc.scripts){
+        let scriptInfo = script.getInfo();
+        scriptInfo.isEnabled = !disabledScripts.includes(script.filename);
+        scripts.push(scriptInfo);
       }
       return scripts
     },
@@ -388,17 +401,20 @@ let _uc = {
       if(!isElement && typeof el != "string"){
         return
       }
-      let script = _uc.scripts[isElement ? el.getAttribute("filename") : el];
+      const name = isElement ? el.getAttribute("filename") : el;
+      let script = _uc.scripts.find(script => script.filename === name);
       if(!script){
-        console.log("no script to toggle");
-        return
+        return null
       }
+      let newstate = true;
       if (script.isEnabled) {
         yPref.set(_uc.PREF_SCRIPTSDISABLED, `${script.filename},${yPref.get(_uc.PREF_SCRIPTSDISABLED)}`);
+        newstate = false;
       } else {
         yPref.set(_uc.PREF_SCRIPTSDISABLED, yPref.get(_uc.PREF_SCRIPTSDISABLED).replace(new RegExp(`^${script.filename},?|,${script.filename}`), ''));
       }
       Services.appinfo.invalidateCachesOnRestart();
+      return { script: name, enabled: newstate }
     },
     
     updateStyleSheet: function(name = "../userChrome.css",type){
@@ -605,36 +621,43 @@ UserChrome_js.prototype = {
         window.gBrowser = window._gBrowser;
       }
       let isWindow = window.isChromeWindow;
-
-        /* Add a way to toggle scripts in tools menu */
-      let menu, popup, item;
-      let ce = _uc.utils.createElement;
-      if(isWindow){
-        menu = document.querySelector("#menu_openDownloads");
-        if(menu){
-          try{
-            popup = ce(document,"menupopup",{id:"menuUserScriptsPopup",onpopupshown:`_ucUtils.updateMenuStatus(this)`});
-            item = ce(document,"menu",{id:"userScriptsMenu",label:"userScripts"});
-          }catch(e){
-            isWindow = false;
+      
+      // Inject scripts to window
+      if(yPref.get(_uc.PREF_ENABLED)){
+        const disabledScripts = (yPref.get(_uc.PREF_SCRIPTSDISABLED) || '').split(",");
+        for(let script of _uc.scripts){
+          if(!disabledScripts.includes(script.filename)){
+            _uc.loadScript(script, window);
           }
-        }else{
-          isWindow = false;
         }
       }
-      if(yPref.get(_uc.PREF_ENABLED)){
-        Object.values(_uc.scripts).forEach(script => {
-          _uc.loadScript(script, window);
-          if(isWindow){
-            popup.appendChild(ce(document,"menuitem",{type:"checkbox",label:script.name||script.filename,filename:script.filename,checked:"true",oncommand:`_ucUtils.toggleScript(this)`}))
-          }
-        });
-      }
-      if(isWindow){
-        popup.appendChild(ce(document,"menuseparator",{}));
-        popup.appendChild(ce(document,"menuitem",{label:"Restart now!",oncommand:"_ucUtils.restart(true)",tooltiptext:"Toggling scripts requires a restart"}));
-        item.appendChild(popup);
-        menu.parentNode.insertBefore(item,menu);
+
+      // Add simple script menu to menubar tools popup
+      const menu = document.querySelector("#menu_openDownloads");
+      if(isWindow && menu){
+        let menuFragment = window.MozXULElement.parseXULToFragment(`
+          <menu id="userScriptsMenu" label="userScripts">
+            <menupopup id="menuUserScriptsPopup" onpopupshown="_ucUtils.updateMenuStatus(this)">
+              <menuseparator></menuseparator>
+              <menuitem label="Restart now!" oncommand="_ucUtils.restart(true)" tooltiptext="Toggling scripts requires restart"></menuitem>
+            </menupopup>
+          </menu>
+        `);
+        const itemsFragment = window.MozXULElement.parseXULToFragment("");
+        for(let script of _uc.scripts){
+          itemsFragment.append(
+            window.MozXULElement.parseXULToFragment(`
+              <menuitem type="checkbox"
+                        label="${script.name || script.filename}"
+                        filename="${script.filename}"
+                        checked="true"
+                        oncommand="_ucUtils.toggleScript(this)">
+              </menuitem>
+          `)
+          );
+        }
+        menuFragment.getElementById("menuUserScriptsPopup").prepend(itemsFragment);
+        menu.parentNode.insertBefore(menuFragment,menu);
       }
     }
   }
