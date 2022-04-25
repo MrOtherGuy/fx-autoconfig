@@ -208,7 +208,7 @@ function updateStyleSheet(name,type) {
       return false
     }
   }
-  let entry = utils.getFSEntry(name);
+  let entry = getDirEntry(name);
   if(!(entry && entry.isFile())){
     return false
   }
