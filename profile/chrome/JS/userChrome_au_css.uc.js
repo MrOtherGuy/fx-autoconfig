@@ -16,7 +16,7 @@
       if(!win || !this.sheet){
         return
       }
-      win.windowUtils.addSheet(this.sheet,Ci.nsIDOMWindowUtils.AGENT_SHEET);
+      win.windowUtils.addSheet(this.sheet,Ci.nsIDOMWindowUtils.AUTHOR_SHEET);
     }
   };
   // The next things execute only once per sessions because of @onlyonce in the header
