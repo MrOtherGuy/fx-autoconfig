@@ -403,6 +403,26 @@ If `tab` key exists then the notification will be shown in that tab only. Otherw
 
 See more about `buttons` and `callback` keys at [notificationbox.js](https://searchfox.org/mozilla-central/rev/3f782c2587124923a37c750b88c5a40108077057/toolkit/content/widgets/notificationbox.js#113)
 
+### _ucUtils.updateStylesheet(name, sheet_mode) -> boolean
+
+```js
+_ucUtils.updateStylesheet() // reloads userChrome.css
+
+ // reloads a style in author-mode stylesheets list with matching name
+_ucUtils.updateStylesheet("userChrome.au.css","author")
+
+ // reloads a style in agent-mode stylesheets list with matching name
+_ucUtils.updateStylesheet("userChrome.ag.css","agent")
+```
+
+Argument `filename` is relative to `resources` folder, but you can use `../` prefix to get back to `chrome` folder.
+
+Note, you can't reload a style that is in one sheet-mode list into another sheet-mode. Such as, you cannot use this to reload userChrome.css into agent-mode list.
+
+Return value true/false indicates wheter a style file with specified name was found in the corresponding list.
+
+If the specified stylesheet imports other files, then calling this will also reload any of those imported files. However, in experience it might be that reload of imported stylesheets does not take effect until a new window is created.
+
 ## Prefs
 
 A shortcut for reading and writing preferences
