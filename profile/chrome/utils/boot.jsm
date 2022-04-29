@@ -64,6 +64,7 @@ Object.defineProperty(SHARED_GLOBAL,"widgetCallbacks",{value:new Map()});
 const BROWSERCHROME = 'chrome://browser/content/browser.xhtml';
 const PREF_ENABLED = 'userChromeJS.enabled';
 const PREF_SCRIPTSDISABLED = 'userChromeJS.scriptsDisabled';
+const PREF_GBROWSERHACKENABLED = 'userChromeJS.gBrowser_hack.enabled';
 const SCRIPT_DIR = resolveChromePath('chrome://userscripts/content/');
 const RESOURCE_DIR = resolveChromePath('chrome://userchrome/content/');
 const BASE_FILEURI = Services.io.getProtocolHandler('file')
@@ -584,9 +585,14 @@ if (yPref.get(PREF_SCRIPTSDISABLED) === undefined) {
   yPref.set(PREF_SCRIPTSDISABLED, '');
 }
 
+if (yPref.get(PREF_GBROWSERHACKENABLED) === undefined) {
+  yPref.set(PREF_GBROWSERHACKENABLED, false);
+}
+
 function UserChrome_js() {
   this.scripts = [];
   this.SESSION_RESTORED = false;
+  this.GBROWSERHACK_ENABLED = yPref.get(PREF_GBROWSERHACKENABLED);
   
   if(!yPref.get(PREF_ENABLED) || !(/^[\w_]*$/.test(SCRIPT_DIR))){
     console.log("Scripts are disabled or the given script directory name is invalid");
@@ -626,6 +632,13 @@ UserChrome_js.prototype = {
     if(regex.test(window.location.href)) {
       Object.defineProperty(window,"_ucUtils",{ get: () => utils });
       document.allowUnsafeHTML = false; // https://bugzilla.mozilla.org/show_bug.cgi?id=1432966
+
+      // This is a hack to make gBrowser available for scripts.
+      // Without it, scripts would need to check if gBrowser exists and deal
+      // with it somehow. See bug 1443849
+      if(this.GBROWSERHACK_ENABLED && window._gBrowser){
+        window.gBrowser = window._gBrowser;
+      }
 
       let isWindow = window.isChromeWindow;
       
