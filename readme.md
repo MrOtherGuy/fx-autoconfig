@@ -592,7 +592,7 @@ if(window._gBrowser){
 }
 ```
 
-Note that the second option does not work if gBrowser is accessed as a side-effect of using something else. For example, if you accessed `gURLBar`, then you might be able to (depending what you try to do) be able to instead get reference to urlbar element and use that:
+Note that the second option does not work if gBrowser is accessed as a side-effect of using something else. For example, if you accessed `gURLBar`, then you might be able to (depending what you try to do) instead get reference to urlbar element and use that:
 
 ```js
   gURLBar.someproperty // old
