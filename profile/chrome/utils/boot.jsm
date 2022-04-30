@@ -589,10 +589,55 @@ if (yPref.get(PREF_GBROWSERHACKENABLED) === undefined) {
   yPref.set(PREF_GBROWSERHACKENABLED, false);
 }
 
+function showgBrowserNotification(){
+  yPref.set(PREF_GBROWSERHACKENABLED,true);
+  utils.showNotification(
+  {
+    label : "fx-autoconfig: Something was broken in last startup",
+    type : "fx-autoconfig-gbrowser-notification",
+    priority: "critical",
+    buttons: [{
+      label: "Why am I seeing this?",
+      callback: (notification) => {
+        notification.ownerGlobal.openWebLinkIn(
+          "https://github.com/MrOtherGuy/fx-autoconfig#startup-error",
+          "tab"
+        );
+        return false
+      }
+    }]
+  }
+  )
+}
+
+function showBrokenNotification(window){
+  let aNotificationBox = window.gNotificationBox;
+  aNotificationBox.appendNotification(
+    "fx-autoconfig-broken-notification",
+    {
+      label: "fx-autoconfig: Startup is broken",
+      image: "chrome://browser/skin/notification-icons/popup.svg",
+      priority: "critical"
+    },
+    [{
+      label: "Enable workaround",
+      callback: (notification) => {
+        yPref.set("userChromeJS.gBrowser_hack.required",true);
+        utils.restart(false);
+        return false
+      }
+    }]
+  );
+}
+
 function UserChrome_js() {
   this.scripts = [];
   this.SESSION_RESTORED = false;
-  this.GBROWSERHACK_ENABLED = yPref.get(PREF_GBROWSERHACKENABLED);
+  this.isInitialWindow = true;
+  
+  const gBrowserHackRequired = yPref.get("userChromeJS.gBrowser_hack.required") ? 2 : 0;
+  const gBrowserHackEnabled = yPref.get(PREF_GBROWSERHACKENABLED) ? 1 : 0;
+  this.GBROWSERHACK_ENABLED = gBrowserHackRequired|gBrowserHackEnabled;
   
   if(!yPref.get(PREF_ENABLED) || !(/^[\w_]*$/.test(SCRIPT_DIR))){
     console.log("Scripts are disabled or the given script directory name is invalid");
@@ -632,14 +677,24 @@ UserChrome_js.prototype = {
     if(regex.test(window.location.href)) {
       Object.defineProperty(window,"_ucUtils",{ get: () => utils });
       document.allowUnsafeHTML = false; // https://bugzilla.mozilla.org/show_bug.cgi?id=1432966
-
+      
       // This is a hack to make gBrowser available for scripts.
       // Without it, scripts would need to check if gBrowser exists and deal
       // with it somehow. See bug 1443849
-      if(this.GBROWSERHACK_ENABLED && window._gBrowser){
+      const _gb = "_gBrowser" in window;
+      if(this.GBROWSERHACK_ENABLED && _gb){
         window.gBrowser = window._gBrowser;
+      }else if(_gb && this.isInitialWindow){
+        this.isInitialWindow = false;
+        let timeout = window.setTimeout(() => {
+          showBrokenNotification(window);
+        },5000);
+        utils.windowIsReady(window)
+        .then(() => {
+          // startup is fine, clear timeout
+          window.clearTimeout(timeout);
+        })
       }
-
       let isWindow = window.isChromeWindow;
       
       // Inject scripts to window
@@ -686,4 +741,7 @@ UserChrome_js.prototype = {
   }
 }
 const _ucjs = !Services.appinfo.inSafeMode && new UserChrome_js();
-_ucjs && utils.startupFinished().then(()=>{ _ucjs.SESSION_RESTORED = true});
+_ucjs && utils.startupFinished().then(()=>{
+  _ucjs.SESSION_RESTORED = true;
+  _ucjs.GBROWSERHACK_ENABLED === 2 && showgBrowserNotification();
+});
