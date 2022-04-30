@@ -388,9 +388,9 @@ _ucUtils.showNotification(
     label : "Message content",  // text shown in the notification
     type : "something",         // opt identifier for this notification
     priority: "info",           // opt one of ["system","critical","warning","info"]
-    window: window.top          // opt reference to a chromeWindow
+    window: window.top ,        // opt reference to a chromeWindow
     tab: gBrowser.selectedTab,  // opt reference to a tab
-    buttons: [...]              // opt array of button descriptors
+    buttons: [...],             // opt array of button descriptors
     callback: () => {}          // opt function to be called when notification is dismissed
   }
 )
@@ -546,3 +546,57 @@ _ucUtils.sharedGlobal.myScriptObject = {
 ```
 
 **NOTE** This is behavior is completely incompatible with the way old userscripts implement startup - which generally was of form `eval(<whatever_is_in_header_startup>)`
+
+# Startup Error
+
+Did you experience broken Firefox startup with message banner:
+
+```js
+"fx-autoconfig: Startup is broken"
+```
+
+Did it provide you with a button to "Enable workaround"? And after restart you got another banner message:
+
+```js
+"fx-autoconfig: Something was broken in last startup"
+```
+
+Clicking the button sent you here, right? So what is going on here?
+Fear not! Here's what's happening... probably.
+
+In older versions of this loader script, boot.jsm had a hack to make a Firefox internal `gBrowser` object available for your custom scripts. However, said hack is now disabled by default in latest versions of boot.jsm.
+
+So, if boot.jsm detects that startup has been broken because gBrowser is not available, it will show said banner. Clicking the "Enable workaround"-button will tell boot.jsm to set a pref `userChromeJS.gBrowser_hack.enabled` to `true` on next startup. You can always set that pref manually if you wish.
+
+Note: there's is also related pref `userChromeJS.gBrowser_hack.required` which boot.jsm uses to tell itself that startup was broken on last run.
+
+## What causes this error?
+
+Somewhere in your custom scripts you are using `gBrowser` object which is not necessarily available at the time you are executing your script. Do note however, that you don't have to be using gBrowser directly in your script, it may happen as a side-effect of accessing some other internal object.
+
+One notable example is if you try to access `gURLBar` - that will internally end up accessing gBrowser - which does not exist and that will break startup.
+
+## What can you do to not rely on gBrowser?
+
+Think about when your script needs to run and you have some options:
+
+* Wait until windows have been restored before running functions that access gBrowser. One method for that would be: `_ucUtils.startupFinished().then(myFunctionAccessinggBrowser)`
+
+* Check in your function whether `gBrowser` is available, and if not use `_gBrowser` instead.
+
+* Apply the original hack that was done by boot.jsm:
+
+```js
+if(window._gBrowser){
+  window.gBrowser = window._gBrowser;
+}
+```
+
+Note that the second option does not work if gBrowser is accessed as a side-effect of using something else. For example, if you accessed `gURLBar`, then you might be able to (depending what you try to do) be able to instead get reference to urlbar element and use that:
+
+```js
+  gURLBar.someproperty // old
+  document.getElementById("urlbar").someproperty // replacement
+```
+
+Or you can simply set `userChromeJS.gBrowser_hack.enabled` to `true`
