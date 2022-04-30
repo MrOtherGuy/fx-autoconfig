@@ -651,7 +651,7 @@ function UserChrome_js() {
       this.scripts.push(script);
       if(script.inbackground && script.isEnabled){
         try{
-          Cu.import(`chrome://userscripts/content/${script.filename}`);
+          ChromeUtils.import(`chrome://userscripts/content/${script.filename}`);
           script.isRunning = true;
         }catch(e){
           console.error(e);
