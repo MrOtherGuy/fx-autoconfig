@@ -730,11 +730,12 @@ UserChrome_js.prototype = {
       // Add simple script menu to menubar tools popup
       const menu = document.querySelector("#menu_openDownloads");
       if(isWindow && menu){
+        window.MozXULElement.insertFTLIfNeeded("browser/preferences/preferences.ftl");
         let menuFragment = window.MozXULElement.parseXULToFragment(`
           <menu id="userScriptsMenu" label="userScripts">
             <menupopup id="menuUserScriptsPopup" onpopupshown="_ucUtils.updateMenuStatus(this)">
               <menuseparator></menuseparator>
-              <menuitem label="Restart now!" oncommand="_ucUtils.restart(true)" tooltiptext="Toggling scripts requires restart"></menuitem>
+              <menuitem id="userScriptsRestart" label="Restart" oncommand="_ucUtils.restart(true)" tooltiptext="Toggling scripts requires restart"></menuitem>
             </menupopup>
           </menu>
         `);
@@ -753,6 +754,11 @@ UserChrome_js.prototype = {
         }
         menuFragment.getElementById("menuUserScriptsPopup").prepend(itemsFragment);
         menu.parentNode.insertBefore(menuFragment,menu);
+        document.l10n
+        .formatValue("should-restart-title")
+        .then((c) =>
+          document.getElementById("userScriptsRestart").setAttribute("label", c)
+        );
       }
     }
   }
