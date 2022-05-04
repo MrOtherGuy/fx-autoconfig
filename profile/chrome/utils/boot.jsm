@@ -630,6 +630,23 @@ function showBrokenNotification(window){
   );
 }
 
+function escapeXUL(markup) {
+  return markup.replace(/[<>&'"]/g, (char) => {
+    switch (char) {
+      case `<`:
+        return "&lt;";
+      case `>`:
+        return "&gt;";
+      case `&`:
+        return "&amp;";
+      case `'`:
+        return "&apos;";
+      case '"':
+        return "&quot;";
+    }
+  });
+}
+
 function UserChrome_js() {
   this.scripts = [];
   this.SESSION_RESTORED = false;
@@ -713,22 +730,6 @@ UserChrome_js.prototype = {
       // Add simple script menu to menubar tools popup
       const menu = document.querySelector("#menu_openDownloads");
       if(isWindow && menu){
-        function escapeXUL(markup) {
-          return markup.replace(/[<>&'"]/g, (char) => {
-            switch (char) {
-              case `<`:
-                return "&lt;";
-              case `>`:
-                return "&gt;";
-              case `&`:
-                return "&amp;";
-              case `'`:
-                return "&apos;";
-              case '"':
-                return "&quot;";
-            }
-          });
-        }
         let menuFragment = window.MozXULElement.parseXULToFragment(`
           <menu id="userScriptsMenu" label="userScripts">
             <menupopup id="menuUserScriptsPopup" onpopupshown="_ucUtils.updateMenuStatus(this)">
