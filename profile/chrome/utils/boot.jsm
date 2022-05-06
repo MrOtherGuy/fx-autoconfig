@@ -128,8 +128,10 @@ class ScriptData {
       return
     }
     try {
-      if(this.onlyonce && this.isRunning && this.startup) {
-        SHARED_GLOBAL[this.startup]._startup(win)
+      if(this.onlyonce && this.isRunning) {
+        if (this.startup) {
+          SHARED_GLOBAL[this.startup]._startup(win)
+        }
         return
       }
 
