@@ -41,7 +41,9 @@ Copy `defaults/` and `config.js` there from the `program` folder. `config.js` sh
 <details>
 <summary>MacOS</summary>
 
-Unknown. Someone with mac should test how it goes.
+Firefox is typically installed to `/Applications/Firefox.app/Contents/MacOS/`
+
+Copy `defaults/` and `config.js` to `/Applications/Firefox.app/Contents/Resources/` from the `program` folder. `config.js` should end up in the `/Applications/Firefox.app/Contents/Resources/` directory.
 
 </details>
 
