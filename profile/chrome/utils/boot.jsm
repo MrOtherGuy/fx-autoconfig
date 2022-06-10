@@ -322,6 +322,9 @@ const utils = {
     if(typeof aFile === "string"){
       aFile = getDirEntry(aFile);
     }
+    if(!aFile){
+      return null
+    }
     let stream = Cc['@mozilla.org/network/file-input-stream;1'].createInstance(Ci.nsIFileInputStream);
     let cvstream = Cc['@mozilla.org/intl/converter-input-stream;1'].createInstance(Ci.nsIConverterInputStream);
     try{
