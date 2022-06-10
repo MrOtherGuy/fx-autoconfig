@@ -7,6 +7,7 @@
 // ==/UserScript==
 
 let EXPORTED_SYMBOLS = [];
+let is_success = false;
 (function () {
   const {Services} = ChromeUtils.import('resource://gre/modules/Services.jsm');
 	let sss = Cc['@mozilla.org/content/style-sheet-service;1'].getService(Ci.nsIStyleSheetService);
@@ -20,3 +21,4 @@ let EXPORTED_SYMBOLS = [];
     console.error(`Could not load userChrome.ag.css: ${e.name}`)
   }
 })();
+console.log("userChrome_agent_css passed: "+is_success)

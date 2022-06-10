@@ -12,4 +12,4 @@ try{
   is_success = true;
 }
 
-console.log("test_module_script passed" : is_success);
+console.log("test_module_script passed: "+  is_success);
