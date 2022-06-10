@@ -771,8 +771,16 @@ UserChrome_js.prototype = {
     }
   }
 }
+
 const _ucjs = !Services.appinfo.inSafeMode && new UserChrome_js();
-_ucjs && utils.startupFinished().then(()=>{
+_ucjs && utils.startupFinished().then(() => {
   _ucjs.SESSION_RESTORED = true;
   _ucjs.GBROWSERHACK_ENABLED === 2 && showgBrowserNotification();
+  if(!yPref.get("userChromeJS.firstRunShown")){
+    yPref.set("userChromeJS.firstRunShown",true);
+    utils.showNotification({
+      type: "fx-autoconfig-installed",
+      label: `fx-autoconfig: ${utils.brandName} is being modified with custom autoconfig scripting`
+    });
+  }
 });
