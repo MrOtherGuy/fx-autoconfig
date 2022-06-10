@@ -602,3 +602,15 @@ Note that the second option does not work if gBrowser is accessed as a side-effe
 ```
 
 Or you can simply set `userChromeJS.gBrowser_hack.enabled` to `true`
+
+# Tests
+
+Very WIP
+
+There are few simplistic tests inside the `test_profile` directory. To run them you need to launch Firefox with command-line arguments pointing Firefox to use the `test_profile` folder as a non-relative profile. That would go for example like this:
+
+```
+firefox -profile "C:/things/fx-autoconfig/test_profile"
+```
+
+Test results should be printed to browser console.
