@@ -487,13 +487,72 @@ while(contents.hasMoreElements()){
 }
 ```
 
-### _ucUtils.readFile(fileHandle,metaOnly) -> String
+### _ucUtils.readFile(<fileHandle or string>,metaOnly) -> String
 
 ```js
 _ucUtils.readFile(aFile,false)
 ```
 
+```js
+let content = _ucUtils.readFile("test.txt")
+
+>> console.log(content)
+<< "some file content"
+```
+
 Attempts to read the content of the given fileHandle as text. Boolean metaOnly is used to parse only the metadata of userScripts when reading them from script directory.
+
+When first argument is a string, the filename is parsed as being relative to the **resources** directory.
+
+### _ucUtils.readFileAsync(fileName) -> Promise <filecontent>
+
+```js
+
+// read from resources directory
+
+_ucUtils.readFileAsync("test.txt")
+.then(content => console.log(content))
+
+<< "some file content"
+
+// read from parent directory of resources:
+
+_ucUtils.readFileAsync("../userChrome.css")
+.then(content => console.log(content))
+
+<< "#nav-bar{ background: #f00 !important }"
+```
+
+Asynchronous file reading. Filename must be a string corresponding to a file relative to **resources** directory. Promise is rejected if file isn't found.
+
+### _ucUtils.readJSON(fileName) -> Promise <Object>
+
+```js
+_ucUtils.readJSON("some.json")
+.then(some => console.log(some))
+
+<< Object { test: "Hello world!", value: 42 }
+```
+
+A wrapper for `_ucUtils.readFileAsync` which tries to parse the file contents as JSON.
+
+### _ucUtils.writeFile( fileName, content, [options] ) -> Promise <Number>
+
+```js
+let some_content = "Hello world!\n";
+let bytes = await _ucUtils.writeFile( "hello.txt", some_content );
+console.log(bytes);
+
+<< 13
+```
+
+Write the content into file **as UTF8**. On successful write the promise is resolved with number of written bytes.
+
+By default writing files using this API is only allowed in **resources** directory. Calling `writeFile` with fileName like "../test.txt" will then reject the promise. You must set pref `userChromeJS.allowUnsafeWrites` to `true` to allow writing outside of resources.
+
+**Note!** Currently this method **replaces** the existing file if one exists.
+
+The optional `options` argument is currently only used to pass a filename for temp file. By default it is derived from fileName. 
 
 ### _ucUtils.createFileURI(fileName) -> String
 

@@ -16,12 +16,11 @@ class Test{
   exec(){
     return this.fun()
   }
-  expect(expect,lazy){
-    if(lazy){
-      Test.runnerAsync(this,expect)
-    }else{
-      Test.runner(this,expect)
-    }
+  expectAsync(expect){
+    Test.runnerAsync(this, expect)
+  }
+  expect(expect){
+    Test.runner(this, expect)
   }
   static runner(test,expect){
     try{
@@ -79,6 +78,29 @@ new Test("readFileFromFile",()=>{
   return _ucUtils.readFile(file);
 }).expect("This is a test file used in testing");
 
+new Test("readFileAsync",()=>{
+  return _ucUtils.readFileAsync("test_file.txt")
+}).expectAsync("This is a test file used in testing");
+
+new Test("readJSON",()=>{
+  return new Promise((res,rej) => {
+    _ucUtils.readJSON("test_json.json")
+    .then(some => res(some.property))
+    .catch((err) => rej(err))
+  })
+}).expectAsync("This is a test file used in testing");
+
+new Test("writeFileBasic",()=>{
+  return new Promise((res,rej) => {
+    let bytes = null;
+    _ucUtils.writeFile("write_test_basic.txt","test file content")
+    .then(some => { bytes = some })
+    .then(() => _ucUtils.readFileAsync("write_test_basic.txt"))
+    .then((text)=> res(text+": "+bytes) )
+    .catch((err) => rej(err))
+  })
+}).expectAsync("test file content: 17");
+
 new Test("listFileNames",()=>{
   let files = _ucUtils.getFSEntry("../tests/");
   let names = [];
@@ -135,7 +157,7 @@ new Test("startupFinished",()=>{
     _ucUtils.startupFinished()
     .then(()=>res(42))
   })
-}).expect(42,true /*async*/);
+}).expectAsync(42);
 
 new Test("WindowIsReady",()=>{
   return new Promise((res,rej) => {
@@ -143,7 +165,7 @@ new Test("WindowIsReady",()=>{
     _ucUtils.windowIsReady(window)
     .then(()=>res(42))
   })
-}).expect(42,true /*async*/);
+}).expectAsync(42);
 
 new Test("registerHotkey",()=>{
   
