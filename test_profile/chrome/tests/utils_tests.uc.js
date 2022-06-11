@@ -26,7 +26,7 @@ class Test{
     try{
       let value = test.exec();
       if(value === expect){
-        console.log(test.name+": OK")
+        Test.logSuccess(test);
       }else{
         console.warn(`${test.name} failed: expected: ${expect} - got: ${value}`);
       }
@@ -34,17 +34,30 @@ class Test{
       console.error(e);
     }
   }
+  static logSuccess(test){
+    console.info(`%c${test.name}: OK`,"color: lightgreen");
+  }
   static async runnerAsync(test,expect){
     try{
       let value = await test.exec();
       if(value === expect){
-        console.log(test.name+": OK")
+        Test.logSuccess(test);
       }else{
         console.warn(`${test.name} failed: expected: ${expect} - got: ${value}`);
       }
     }catch(e){
       console.error(e);
     }
+  }
+  static createTimeout(){
+    return new Promise(res => {
+      setTimeout(res,2000)
+    })
+  }
+  static createTimeoutLong(){
+    return new Promise(res => {
+      setTimeout(res,6000)
+    })
   }
 }
 
@@ -96,7 +109,7 @@ new Test("writeFileBasic",()=>{
     _ucUtils.writeFile("write_test_basic.txt","test file content")
     .then(some => { bytes = some })
     .then(() => _ucUtils.readFileAsync("write_test_basic.txt"))
-    .then((text)=> res(text+": "+bytes) )
+    .then((text) => res(text+": "+bytes) )
     .catch((err) => rej(err))
   })
 }).expectAsync("test file content: 17");
@@ -147,7 +160,38 @@ new Test("getWindows",()=>{
 
 // TODO togglescript
 
-// TODO updateStyleSheet
+new Test("updateStyleSheet",()=>{
+  _ucUtils.prefs.set("userChromeJS.allowUnsafeWrites",true);
+  
+  return new Promise((res,rej) => {
+    _ucUtils.windowIsReady(window)
+    .then(()=>{
+      let color = window.getComputedStyle(document.getElementById("nav-bar")).backgroundColor;
+      _ucUtils.writeFile("../userChrome.css","#nav-bar{ background: #ba5 !important; }")
+      .then(()=>_ucUtils.updateStyleSheet())
+      .then(Test.createTimeout)
+      .then(()=>{
+        res(color + " : " + window.getComputedStyle(document.getElementById("nav-bar")).backgroundColor)
+      })
+    })
+    .catch(err => rej(err))
+  })
+}).expectAsync("rgb(255, 0, 0) : rgb(187, 170, 85)");
+
+// Restore old userChrome.css state
+// The above test setup sets pref to allow writing outside of resources so this should succeed.
+new Test("writeUserChromeCSS",() => {
+  return new Promise((res,rej) => {
+    Test.createTimeoutLong()
+    .then(()=>{
+      return _ucUtils.writeFile("../userChrome.css","#nav-bar{ background: #f00 !important; }")
+    })
+    .then(res)
+    .catch(rej)
+  })
+}).expectAsync(40)
+
+// TODO add test case where write should fail
 
 // TODO updateMenuStatus
 

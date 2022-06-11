@@ -11,7 +11,7 @@ try{
   is_success = true;
 }
 if(is_success){
-  console.log("test_module_script: OK");
+  console.info("%ctest_module_script: OK");
 }else{
   console.warn("test_module_script: expected failure got: success")
 }
