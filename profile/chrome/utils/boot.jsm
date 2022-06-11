@@ -347,6 +347,61 @@ const utils = {
     return content.replace(/\r\n?/g, '\n');
   },
   
+  readFileAsync: function(path){
+    if(typeof path !== "string"){
+      return Promise.reject("readFileAsync: path is not a string")
+    }
+    let base = ["chrome",RESOURCE_DIR];
+    let parts = path.split(/[\\\/]/);
+    while(parts[0] === ".."){
+      base.pop();
+      parts.shift();
+    }
+    return IOUtils.readUTF8(
+      PathUtils.join( PathUtils.profileDir, ...base.concat(parts) )
+    )
+  },
+  
+  readJSON: async function(path){
+    try{
+      let content = await utils.readFileAsync(path);
+      return JSON.parse(content);
+    }catch(ex){
+      console.error(ex)
+    }
+    return null
+  },
+  
+  writeFile: async function(path, content, options = {}){
+    if(!path || typeof path !== "string"){
+      throw "writeFile: path is invalid"
+    }
+    if(typeof content !== "string"){
+      throw "writeFile: content to write must be a string"
+    }
+
+    let base = ["chrome",RESOURCE_DIR];
+    let parts = path.split(/[\\\/]/);
+    
+    // Normally, this API can only write into resources directory
+    // Writing outside of resources can be enabled using following pref
+    const disallowUnsafeWrites = !yPref.get("userChromeJS.allowUnsafeWrites");
+
+    while(parts[0] === ".."){
+      if(disallowUnsafeWrites){
+        throw "Writing outside of resources directory is not allowed"
+      }
+      base.pop();
+      parts.shift();
+    }
+    const fileName = PathUtils.join( PathUtils.profileDir, ...base.concat(parts) );
+    
+    if(!options.tmpPath){
+      options.tmpPath = fileName + ".tmp";
+    }
+    return IOUtils.writeUTF8( fileName, content, options );
+  },
+  
   createFileURI: (fileName = "") => {
     fileName = String(fileName);
     let u = resolveChromeURL(`chrome://userchrome/content/${fileName}`);
