@@ -3,15 +3,12 @@
 // @backgroundmodule
 // ==/UserScript==
 let EXPORTED_SYMBOLS = [];
-let is_success = false;
-const x = 23;
-try{
-  let x = window;
-}catch(e){
-  is_success = true;
-}
-if(is_success){
-  console.info("%ctest_module_script: OK");
-}else{
-  console.warn("test_module_script: expected failure got: success")
-}
+const { Test } = ChromeUtils.import("chrome://userscripts/content/000_test_runner.uc.js");
+
+new Test("expectError_no_utils",()=>{
+  return _ucUtils.sharedGlobal.test_utils.x
+}).expectError();
+
+new Test("expectError_no_window",()=>{
+  return window
+}).expectError();

@@ -4,62 +4,21 @@
 // @loadOrder 5
 // ==/UserScript==
 
+"use strict";
 const BRAND_NAME = "Firefox Nightly";
 const x_value = 42;
+
+
+const { Test } = ChromeUtils.import("chrome://userscripts/content/000_test_runner.uc.js");
+
 _ucUtils.sharedGlobal.test_utils = { x: 42 };
 
-class Test{
-  constructor(name,fun){
-    this.name = name;
-    this.fun = fun;
-  }
-  exec(){
-    return this.fun()
-  }
-  expectAsync(expect){
-    Test.runnerAsync(this, expect)
-  }
-  expect(expect){
-    Test.runner(this, expect)
-  }
-  static runner(test,expect){
-    try{
-      let value = test.exec();
-      if(value === expect){
-        Test.logSuccess(test);
-      }else{
-        console.warn(`${test.name} failed: expected: ${expect} - got: ${value}`);
-      }
-    }catch(e){
-      console.error(e);
-    }
-  }
-  static logSuccess(test){
-    console.info(`%c${test.name}: OK`,"color: lightgreen");
-  }
-  static async runnerAsync(test,expect){
-    try{
-      let value = await test.exec();
-      if(value === expect){
-        Test.logSuccess(test);
-      }else{
-        console.warn(`${test.name} failed: expected: ${expect} - got: ${value}`);
-      }
-    }catch(e){
-      console.error(e);
-    }
-  }
-  static createTimeout(){
-    return new Promise(res => {
-      setTimeout(res,2000)
-    })
-  }
-  static createTimeoutLong(){
-    return new Promise(res => {
-      setTimeout(res,6000)
-    })
-  }
-}
+const TEST_FILES = [
+"000_test_runner.uc.js",
+"aaa_test_script.uc.js",
+"test_module_script.uc.js",
+"utils_tests.uc.js"
+];
 
 new Test("sharedGlobal",()=>{
   return _ucUtils.sharedGlobal.test_utils.x
@@ -124,7 +83,7 @@ new Test("listFileNames",()=>{
     }
   }
   return names.join(",");
-}).expect("aaa_test_script.uc.js,test_module_script.uc.js,utils_tests.uc.js");
+}).expect(TEST_FILES.join(","));
 
 // TODO createFileURI
 
@@ -147,18 +106,24 @@ new Test("getFSEntry",()=>{
 new Test("getScriptData",()=>{
   let scripts = _ucUtils.getScriptData();
   return scripts.map(a => a.name).sort().join(",");
-}).expect("test_module_script,test_utils,");
+}).expect("test_module_script,test_runner,test_utils,");
 
 new Test("getScriptLoadOrder",()=>{
   let scripts = _ucUtils.getScriptData();
   return scripts.sort((a,b) => a.name < b.name ? -1 : 1).map(a=> a.isRunning).join(",");
-}).expect("false,true,false");
+}).expect("false,true,true,false");
 
 new Test("getWindows",()=>{
   return _ucUtils.windows.get()[0].AppConstants.MOZ_APP_BASENAME;
 }).expect("Firefox");
 
 // TODO togglescript
+
+_ucUtils.prefs.set("userChromeJS.allowUnsafeWrites",false);
+
+new Test("excpectError_writeUserChromeCSS_BeforeStartup",() => {
+  return _ucUtils.writeFile("../userChrome.css","#nav-bar{ background: #f00 !important; }")
+}).expectError();
 
 new Test("updateStyleSheet",()=>{
   _ucUtils.prefs.set("userChromeJS.allowUnsafeWrites",true);
@@ -190,8 +155,14 @@ new Test("writeUserChromeCSS",() => {
     .catch(rej)
   })
 }).expectAsync(40)
-
-// TODO add test case where write should fail
+// Set allowUnsafeWrites pref back to false and check that writing to it now fails
+.then(() => {
+  _ucUtils.prefs.set("userChromeJS.allowUnsafeWrites",false);
+  new Test("excpectError_writeUserChromeCSS_AfterStartup",() => {
+    return _ucUtils.writeFile("../userChrome.css","#nav-bar{ background: #f00 !important; }")
+  }).expectError()
+})
+.then(Test.logResults);
 
 // TODO updateMenuStatus
 
