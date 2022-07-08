@@ -6,23 +6,27 @@
 
 "use strict";
 const BRAND_NAME = "Firefox Nightly";
-const x_value = 42;
+const SHARED_GLOBAL_TEST_X = 42;
 
+const { Test } = ChromeUtils.importESModule("chrome://userscripts/content/000_test_runner.sys.mjs");
 
-const { Test } = ChromeUtils.import("chrome://userscripts/content/000_test_runner.uc.js");
+_ucUtils.sharedGlobal.test_utils = { x: SHARED_GLOBAL_TEST_X };
 
-_ucUtils.sharedGlobal.test_utils = { x: 42 };
-
+// Needs to be alphabetical
 const TEST_FILES = [
-"000_test_runner.uc.js",
+"000_test_runner.sys.mjs",
 "aaa_test_script.uc.js",
+"imported_esm.sys.mjs",
+"test_module_script.sys.mjs",
 "test_module_script.uc.js",
 "utils_tests.uc.js"
 ];
+console.info("%crunning tests...","color: rgb(120,160,240)");
+
 
 new Test("sharedGlobal",()=>{
   return _ucUtils.sharedGlobal.test_utils.x
-}).expect(42);
+}).expect(SHARED_GLOBAL_TEST_X);
 
 
 new Test("brandName",()=>{
@@ -103,15 +107,17 @@ new Test("getFSEntry",()=>{
   return _ucUtils.getFSEntry("test_file.txt") != null;
 }).expect(true);
 
+// Note: aaa_test_script.uc.js does not have a name so it gets sorted to last
 new Test("getScriptData",()=>{
   let scripts = _ucUtils.getScriptData();
-  return scripts.map(a => a.name).sort().join(",");
-}).expect("test_module_script,test_runner,test_utils,");
+  return scripts.length + ";" + scripts.map(a => a.name).sort().join(",");
+}).expect(TEST_FILES.length+";test_imported_esm,test_module_script,test_module_script_ESM,test_runner,test_utils,");
 
+// This test assumes that none of the test scripts have been manually disabled
 new Test("getScriptLoadOrder",()=>{
   let scripts = _ucUtils.getScriptData();
   return scripts.sort((a,b) => a.name < b.name ? -1 : 1).map(a=> a.isRunning).join(",");
-}).expect("false,true,true,false");
+}).expect("false,true,true,true,true,false");
 
 new Test("getWindows",()=>{
   return _ucUtils.windows.get()[0].AppConstants.MOZ_APP_BASENAME;
@@ -201,5 +207,22 @@ new Test("registerHotkey",()=>{
 
 // TODO showNotification
 
-// TODO restart
-
+new Test("CancelRestart",()=>{
+  
+  return new Promise((res,rej) => {
+    let reason = null;
+    let restartCancelObserver = (subject, topic, data) => {
+      subject.data = true;
+      reason = data;
+      Services.obs.removeObserver(restartCancelObserver, "quit-application-requested");
+    };
+    Services.obs.addObserver(restartCancelObserver, "quit-application-requested");
+    
+    Test.createTimeout()
+    .then(_ucUtils.restart)
+    .then(some => { return res( `${reason} ${some ? "succeeded" : "canceled"}` ) })
+    .catch(rej)
+  })
+  
+  
+}).expectAsync("restart canceled")
