@@ -87,9 +87,9 @@ class ScriptData {
     this.startup = headerText.match(/\/\/ @startup\s+(.+)\s*$/im)?.[1];
     this.id = headerText.match(/\/\/ @id\s+(.+)\s*$/im)?.[1]
            || `${leafName.split('.uc.js')[0]}@${this.author||'userChromeJS'}`;
-    
+    this.isESM = this.filename.endsWith("sys.mjs");
     this.onlyonce = /\/\/ @onlyonce\b/.test(headerText);
-    this.inbackground = /\/\/ @backgroundmodule\b/.test(headerText);
+    this.inbackground = this.isESM || /\/\/ @backgroundmodule\b/.test(headerText);
     this.ignoreCache = /\/\/ @ignorecache\b/.test(headerText);
     this.isRunning = false;
     
@@ -634,7 +634,13 @@ const utils = {
       "quit-application-requested",
       "restart"
     );
-    Services.startup.quit( Services.startup.eAttemptQuit | Services.startup.eRestart )
+    if (!cancelQuit.data) {
+      Services.startup.quit(
+        Services.startup.eAttemptQuit | Services.startup.eRestart
+      );
+      return true
+    }
+    return false
   }
 }
 
@@ -726,15 +732,20 @@ function UserChrome_js() {
   let files = getDirEntry('',true);
   while(files.hasMoreElements()){
     let file = files.getNext().QueryInterface(Ci.nsIFile);
-    if (/\.uc\.js$/i.test(file.leafName)) {
+    if (/(.+\.uc\.js)|(.+\.sys\.mjs)$/i.test(file.leafName)) {
       let script = ScriptData.fromFile(file);
       this.scripts.push(script);
       if(script.inbackground && script.isEnabled){
         try{
-          ChromeUtils.import(`chrome://userscripts/content/${script.filename}`);
+          const fileName = `chrome://userscripts/content/${script.filename}`;
+          if(script.isESM){
+            ChromeUtils.importESModule( fileName );
+          }else{
+            ChromeUtils.import( fileName );
+          }
           script.isRunning = true;
-        }catch(e){
-          console.error(e);
+        }catch(ex){
+          console.error(new Error(`@ ${script.filename}`,{cause:ex}));
         }
       }
     }
