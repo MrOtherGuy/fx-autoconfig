@@ -16,7 +16,6 @@ _ucUtils.sharedGlobal.test_utils = { x: SHARED_GLOBAL_TEST_X };
 const TEST_FILES = [
 "000_test_runner.sys.mjs",
 "aaa_test_script.uc.js",
-"imported_esm.sys.mjs",
 "test_module_script.sys.mjs",
 "test_module_script.uc.js",
 "utils_tests.uc.js"
@@ -111,13 +110,13 @@ new Test("getFSEntry",()=>{
 new Test("getScriptData",()=>{
   let scripts = _ucUtils.getScriptData();
   return scripts.length + ";" + scripts.map(a => a.name).sort().join(",");
-}).expect(TEST_FILES.length+";test_imported_esm,test_module_script,test_module_script_ESM,test_runner,test_utils,");
+}).expect(TEST_FILES.length+";test_module_script,test_module_script_ESM,test_runner,test_utils,");
 
 // This test assumes that none of the test scripts have been manually disabled
 new Test("getScriptLoadOrder",()=>{
   let scripts = _ucUtils.getScriptData();
   return scripts.sort((a,b) => a.name < b.name ? -1 : 1).map(a=> a.isRunning).join(",");
-}).expect("false,true,true,true,true,false");
+}).expect("false,true,true,true,false");
 
 new Test("getWindows",()=>{
   return _ucUtils.windows.get()[0].AppConstants.MOZ_APP_BASENAME;
@@ -225,4 +224,4 @@ new Test("CancelRestart",()=>{
   })
   
   
-}).expectAsync("restart canceled")
+}).expectAsync("restart canceled");
