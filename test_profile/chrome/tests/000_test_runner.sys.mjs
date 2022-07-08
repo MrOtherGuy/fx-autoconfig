@@ -1,9 +1,6 @@
 // ==UserScript==
 // @name           test_runner
-// @backgroundmodule
 // ==/UserScript==
-
-let EXPORTED_SYMBOLS = ["Test"];
 
 const { setTimeout } = ChromeUtils.import("resource://gre/modules/Timer.jsm");
 
@@ -97,7 +94,7 @@ class Test{
   }
   static createTimeoutLong(){
     return new Promise(res => {
-      setTimeout(res,6000)
+      setTimeout(res,4000)
     })
   }
   static logResults(){
@@ -107,3 +104,4 @@ class Test{
   }
 }
 
+export { Test }
