@@ -87,7 +87,7 @@ The startup-cache folder can be found as follows:
 
 # Usage
 
-The file extension for your custom scripts must be `.uc.js`, the loader script only looks for files with that extension.
+The file extension for your custom scripts must be `.uc.js` or `.sys.mjs` (for backgroundmodule only), the loader script only looks for files with those extensions.
 
 Just put any such files into the `JS` directory. The `JS` directory should be in the same directory where userChrome.css would be. If you wish to change the directory name then you need to modify the `chrome.manifest` file inside `utils` directory. For example change `../JS/` to `../scripts/` to make Firefox load scripts from "scripts" folder.
 
@@ -97,7 +97,7 @@ A global preference to toggle all scripts is `userChromeJS.enabled`. This will d
 
 # API
 
-This manager is NOT entirely compatible with all existing userScripts - specifically scripts that expect a global _uc object or something similar to be available.
+This manager is NOT entirely compatible with all existing userScripts - specifically scripts that expect a global `_uc` object or something similar to be available. This manager does export a `_ucUtils` object to window objects though.
 
 # Script scope
 
@@ -169,9 +169,28 @@ let EXPORTED_SYMBOLS = [];
 // actual script here
 
 ```
-Note that the `EXPORTED_SYMBOLS` array in module global scope is mandatory.
+Alternatively, you can name your script with `.sys.mjs` file extension in which case the loader automatically treats it as backgroundmodule.
 
-You should note that background modules do not have access to window objects when they are being run because they are executed before any window exists. They also do not get access to `_ucUtils` object.
+Note that the `EXPORTED_SYMBOLS` array like above in module global scope is mandatory in `.uc.js` scripts.
+
+### ES6 modules
+
+```js
+// ==UserScript==
+// @name           example sys.mjs module
+// ==/UserScript==
+
+import { Some } from "chrome://userscripts/content/modules/some.sys.mjs";
+// This would import the script from "modules" sub-directory of your scripts folder.
+// Note that such script would not be loaded by boot.jsm itself.
+
+Some.doThing();
+...
+```
+
+The manager loads any `.sys.mjs` files always as backgroundmodule - in addition they are loaded as ES6 modules which means you can use static `import` and `export` declarations inside them.
+
+You should note that background modules do not have access to window objects when they are being run because they are executed before any window exists. Thus, they also do not get access to `_ucUtils` object.
 
 ## @ignorecache
 
