@@ -62,7 +62,21 @@ function resolveChromePath(str){
 const SHARED_GLOBAL = {};
 Object.defineProperty(SHARED_GLOBAL,"widgetCallbacks",{value:new Map()});
 
-const BROWSERCHROME = 'chrome://browser/content/browser.xhtml';
+const APP_VARIANT = (() => {
+  let is_tb = AppConstants.BROWSER_CHROME_URL.startsWith("chrome://messenger");
+  return {
+    THUNDERBIRD: is_tb,
+    FIREFOX: !is_tb
+  }
+})();
+
+const BROWSERCHROME = (() => {
+  if(APP_VARIANT.FIREFOX){
+    return AppConstants.BROWSER_CHROME_URL
+  }
+  return "chrome://messenger/content/messenger.xhtml"
+})();
+
 const PREF_ENABLED = 'userChromeJS.enabled';
 const PREF_SCRIPTSDISABLED = 'userChromeJS.scriptsDisabled';
 const PREF_GBROWSERHACKENABLED = 'userChromeJS.gBrowser_hack.enabled';
@@ -190,6 +204,14 @@ function getDirEntry(filename,isLoader = false){
   }
 }
 
+async function getProfileDir(){
+  if(APP_VARIANT.FIREFOX){
+    return PathUtils.profileDir
+  }
+  // APP_VARIANT = THUNDERBIRD
+  return await PathUtils.getProfileDir()
+}
+
 function updateStyleSheet(name,type) {
   if(type){
     let sss = Cc['@mozilla.org/content/style-sheet-service;1'].getService(Ci.nsIStyleSheetService);
@@ -253,7 +275,7 @@ function updateStyleSheet(name,type) {
 }
 
 const utils = {
-
+  
   get sharedGlobal(){ return SHARED_GLOBAL },
   
   get brandName(){ return AppConstants.MOZ_APP_DISPLAYNAME_DO_NOT_USE },
@@ -357,9 +379,14 @@ const utils = {
       base.pop();
       parts.shift();
     }
-    return IOUtils.readUTF8(
-      PathUtils.join( PathUtils.profileDir, ...base.concat(parts) )
-    )
+    
+    return new Promise(resolve => {
+      getProfileDir()
+      .then((path) => PathUtils.join(path, ...base.concat(parts)))
+      .then(IOUtils.readUTF8)
+      .then(resolve)
+    })
+    
   },
   
   readJSON: async function(path){
@@ -394,7 +421,7 @@ const utils = {
       base.pop();
       parts.shift();
     }
-    const fileName = PathUtils.join( PathUtils.profileDir, ...base.concat(parts) );
+    const fileName = PathUtils.join( await getProfileDir(), ...base.concat(parts) );
     
     if(!options.tmpPath){
       options.tmpPath = fileName + ".tmp";
@@ -434,7 +461,8 @@ const utils = {
   get windows(){
     return {
       get: function (onlyBrowsers = true) {
-        let windows = Services.wm.getEnumerator(onlyBrowsers ? 'navigator:browser' : null);
+        let windowType = APP_VARIANT.FIREFOX ? "navigator:browser" : "mail:3pane";
+        let windows = Services.wm.getEnumerator(onlyBrowsers ? windowType : null);
         let wins = [];
         while (windows.hasMoreElements()) {
           wins.push(windows.getNext());
@@ -492,11 +520,15 @@ const utils = {
       if(_ucjs.SESSION_RESTORED){
         resolve();
       }else{
+        const obs_topic = APP_VARIANT.FIREFOX
+                    ? "sessionstore-windows-restored"
+                    : "mail-delayed-startup-finished";
+                    
         let observer = (subject, topic, data) => {
-          Services.obs.removeObserver(observer, "sessionstore-windows-restored");
+          Services.obs.removeObserver(observer, obs_topic);
           resolve();
         };
-        Services.obs.addObserver(observer, "sessionstore-windows-restored");
+        Services.obs.addObserver(observer, obs_topic);
       }
     });
   },
@@ -504,17 +536,30 @@ const utils = {
   windowIsReady: function(win){
     if(win && win.isChromeWindow){
       return new Promise(resolve => {
-        if(win.gBrowserInit.delayedStartupFinished){
-          resolve();
-        }else{
-          let observer = (subject, topic, data) => {
-            if(subject === win){
-              Services.obs.removeObserver(observer, "browser-delayed-startup-finished");
-              resolve();
-            }
-          };
-          Services.obs.addObserver(observer, "browser-delayed-startup-finished");
+        
+        if(APP_VARIANT.FIREFOX){
+          if(win.gBrowserInit.delayedStartupFinished){
+            resolve();
+            return
+          }
+        }else{ // APP_VARIANT = THUNDERBIRD
+          if(win.gMailInit.delayedStartupFinished){
+            resolve();
+            return
+          }
         }
+        const obs_topic = APP_VARIANT.FIREFOX
+                          ? "browser-delayed-startup-finished"
+                          : "mail-delayed-startup-finished";
+                    
+        let observer = (subject, topic, data) => {
+          if(subject === win){
+            Services.obs.removeObserver(observer, obs_topic);
+            resolve();
+          }
+        };
+        Services.obs.addObserver(observer, obs_topic);
+
       });
     }else{
       return Promise.reject(new Error("reference is not a window"))
@@ -562,6 +607,10 @@ const utils = {
     return true
   },
   loadURI: function(win,desc){
+    if(APP_VARIANT.THUNDERBIRD){
+      console.warn("_ucUtils.loadURI is not supported on Thunderbird");
+      return false
+    }
     if(    !win
         || !desc 
         || !desc.url 
@@ -589,6 +638,10 @@ const utils = {
   get prefs(){ return yPref },
 
   showNotification: async function(description){
+    if(APP_VARIANT.THUNDERBIRD){
+      console.warn('_ucUtils.showNotification is not supported on Thunderbird\nNotification label was: "'+description.label+'"');
+      return
+    }
     await utils.startupFinished();
     let window = description.window;
     if(!(window && window.isChromeWindow)){
@@ -772,7 +825,7 @@ UserChrome_js.prototype = {
       // This is a hack to make gBrowser available for scripts.
       // Without it, scripts would need to check if gBrowser exists and deal
       // with it somehow. See bug 1443849
-      const _gb = "_gBrowser" in window;
+      const _gb = APP_VARIANT.FIREFOX && "_gBrowser" in window;
       if(this.GBROWSERHACK_ENABLED && _gb){
         window.gBrowser = window._gBrowser;
       }else if(_gb && this.isInitialWindow){
@@ -800,9 +853,10 @@ UserChrome_js.prototype = {
           }
         }
       }
-
+      
       // Add simple script menu to menubar tools popup
-      const menu = document.querySelector("#menu_openDownloads");
+      const menu = document.querySelector(
+        APP_VARIANT.FIREFOX ? "#menu_openDownloads" : "menuitem#addressBook");
       if(isWindow && menu){
         window.MozXULElement.insertFTLIfNeeded("toolkit/about/aboutSupport.ftl");
         let menuFragment = window.MozXULElement.parseXULToFragment(`
