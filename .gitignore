@@ -1,2 +1,4 @@
 /test_profile/*
 !/test_profile/chrome
+/test_tb_profile/*
+!/test_tb_profile/chrome
