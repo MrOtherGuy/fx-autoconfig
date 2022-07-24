@@ -83,7 +83,10 @@ class Test{
       test.value = await test.exec();
       RESULTS.push( Result.From(test) )
     }catch(e){
-      console.error(e);
+      let fail = new Failure(test);
+      fail.value = e;
+      RESULTS.push(fail);
+      fail.log();
     }
     return {}
   }
