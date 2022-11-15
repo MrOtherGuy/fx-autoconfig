@@ -424,16 +424,16 @@ If `tab` key exists then the notification will be shown in that tab only. Otherw
 
 See more about `buttons` and `callback` keys at [notificationbox.js](https://searchfox.org/mozilla-central/rev/3f782c2587124923a37c750b88c5a40108077057/toolkit/content/widgets/notificationbox.js#113)
 
-### _ucUtils.updateStylesheet(name, sheet_mode) -> boolean
+### _ucUtils.updateStyleSheet(name, sheet_mode) -> boolean
 
 ```js
-_ucUtils.updateStylesheet() // reloads userChrome.css
+_ucUtils.updateStyleSheet() // reloads userChrome.css
 
  // reloads a style in author-mode stylesheets list with matching name
-_ucUtils.updateStylesheet("userChrome.au.css","author")
+_ucUtils.updateStyleSheet("userChrome.au.css","author")
 
  // reloads a style in agent-mode stylesheets list with matching name
-_ucUtils.updateStylesheet("userChrome.ag.css","agent")
+_ucUtils.updateStyleSheet("userChrome.ag.css","agent")
 ```
 
 Argument `filename` is relative to `resources` folder, but you can use `../` prefix to get back to `chrome` folder.
