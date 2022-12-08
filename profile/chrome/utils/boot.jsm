@@ -1,7 +1,9 @@
 let EXPORTED_SYMBOLS = [];
 
 console.warn( "Browser is executing custom scripts via autoconfig" );
-const {Services} = ChromeUtils.import('resource://gre/modules/Services.jsm');
+const Services =
+  globalThis.Services ||
+  ChromeUtils.import("resource://gre/modules/Services.jsm").Services;
 const {AppConstants} = ChromeUtils.import('resource://gre/modules/AppConstants.jsm');
 
 const yPref = {
