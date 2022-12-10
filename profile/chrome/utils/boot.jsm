@@ -771,130 +771,152 @@ function escapeXUL(markup) {
   });
 }
 
-function UserChrome_js() {
-  this.scripts = [];
-  this.SESSION_RESTORED = false;
-  this.isInitialWindow = true;
-  
-  const gBrowserHackRequired = yPref.get("userChromeJS.gBrowser_hack.required") ? 2 : 0;
-  const gBrowserHackEnabled = yPref.get(PREF_GBROWSERHACKENABLED) ? 1 : 0;
-  this.GBROWSERHACK_ENABLED = gBrowserHackRequired|gBrowserHackEnabled;
-  
-  if(!yPref.get(PREF_ENABLED) || !(/^[\w_]*$/.test(SCRIPT_DIR))){
-    console.log("Scripts are disabled or the given script directory name is invalid");
-    return
+class UserChrome_js{
+  constructor(){
+    this.scripts = [];
+    this.SESSION_RESTORED = false;
+    this.isInitialWindow = true;
+    this.initialized = false;
+    this.init();
   }
-  let files = getDirEntry('',true);
-  while(files.hasMoreElements()){
-    let file = files.getNext().QueryInterface(Ci.nsIFile);
-    if (/(.+\.uc\.js)|(.+\.sys\.mjs)$/i.test(file.leafName)) {
-      let script = ScriptData.fromFile(file);
-      this.scripts.push(script);
-      if(script.inbackground && script.isEnabled){
-        try{
-          const fileName = `chrome://userscripts/content/${script.filename}`;
-          if(script.isESM){
-            ChromeUtils.importESModule( fileName );
-          }else{
-            ChromeUtils.import( fileName );
+  init(){
+    if(this.initialized){
+      return
+    }
+    
+    // gBrowserHack setup
+    const gBrowserHackRequired = yPref.get("userChromeJS.gBrowser_hack.required") ? 2 : 0;
+    const gBrowserHackEnabled = yPref.get(PREF_GBROWSERHACKENABLED) ? 1 : 0;
+    this.GBROWSERHACK_ENABLED = gBrowserHackRequired|gBrowserHackEnabled;
+    
+    // load script data
+    let files = getDirEntry('',true);
+    while(files.hasMoreElements()){
+      let file = files.getNext().QueryInterface(Ci.nsIFile);
+      if (/(.+\.uc\.js)|(.+\.sys\.mjs)$/i.test(file.leafName)) {
+        let script = ScriptData.fromFile(file);
+        this.scripts.push(script);
+        if(script.inbackground && script.isEnabled){
+          try{
+            const fileName = `chrome://userscripts/content/${script.filename}`;
+            if(script.isESM){
+              ChromeUtils.importESModule( fileName );
+            }else{
+              ChromeUtils.import( fileName );
+            }
+            script.isRunning = true;
+          }catch(ex){
+            console.error(new Error(`@ ${script.filename}`,{cause:ex}));
           }
-          script.isRunning = true;
-        }catch(ex){
-          console.error(new Error(`@ ${script.filename}`,{cause:ex}));
         }
       }
     }
+    this.scripts.sort((a,b) => a.loadOrder - b.loadOrder);
+    Services.obs.addObserver(this, 'domwindowopened', false);
+    this.initialized = true;
   }
-  this.scripts.sort((a,b) => a.loadOrder > b.loadOrder);
   
-  Services.obs.addObserver(this, 'domwindowopened', false);
-}
-
-UserChrome_js.prototype = {
-  observe: function (aSubject, aTopic, aData) {
-      aSubject.addEventListener('DOMContentLoaded', this, true);
-  },
-
-  handleEvent: function (aEvent) {
-    let document = aEvent.originalTarget;
-    let window = document.defaultView;
-    let regex = /^chrome:(?!\/\/global\/content\/(commonDialog|alerts\/alert)\.xhtml)|about:(?!blank)/i;
-    // Don't inject scripts to modal prompt windows or notifications
-    if(regex.test(window.location.href)) {
-      Object.defineProperty(window,"_ucUtils",{ get: () => utils });
-      document.allowUnsafeHTML = false; // https://bugzilla.mozilla.org/show_bug.cgi?id=1432966
-      
-      // This is a hack to make gBrowser available for scripts.
-      // Without it, scripts would need to check if gBrowser exists and deal
-      // with it somehow. See bug 1443849
-      const _gb = APP_VARIANT.FIREFOX && "_gBrowser" in window;
-      if(this.GBROWSERHACK_ENABLED && _gb){
-        window.gBrowser = window._gBrowser;
-      }else if(_gb && this.isInitialWindow){
-        this.isInitialWindow = false;
-        let timeout = window.setTimeout(() => {
-          showBrokenNotification(window);
-        },5000);
-        utils.windowIsReady(window)
-        .then(() => {
-          // startup is fine, clear timeout
-          window.clearTimeout(timeout);
-        })
-      }
-      let isWindow = window.isChromeWindow;
-      
-      // Inject scripts to window
-      if(yPref.get(PREF_ENABLED)){
-        const disabledScripts = (yPref.get(PREF_SCRIPTSDISABLED) || '').split(",");
-        for(let script of this.scripts){
-          if(script.inbackground){
-            continue
-          }
-          if(!disabledScripts.includes(script.filename)){
-            script.tryLoadIntoWindow(window)
-          }
+  onDOMContent(document){
+    const window = document.defaultView;
+    if(!(/^chrome:(?!\/\/global\/content\/(commonDialog|alerts\/alert)\.xhtml)|about:(?!blank)/i).test(window.location.href)){
+      // Don't inject scripts to modal prompt windows or notifications
+      return
+    }
+    // TODO maybe store utils differently?
+    Object.defineProperty(window,"_ucUtils",{ get: () => utils });
+    document.allowUnsafeHTML = false; // https://bugzilla.mozilla.org/show_bug.cgi?id=1432966
+    
+    // This is a hack to make gBrowser available for scripts.
+    // Without it, scripts would need to check if gBrowser exists and deal
+    // with it somehow. See bug 1443849
+    const _gb = APP_VARIANT.FIREFOX && "_gBrowser" in window;
+    if(this.GBROWSERHACK_ENABLED && _gb){
+      window.gBrowser = window._gBrowser;
+    }else if(_gb && this.isInitialWindow){
+      this.isInitialWindow = false;
+      let timeout = window.setTimeout(() => {
+        showBrokenNotification(window);
+      },5000);
+      utils.windowIsReady(window)
+      .then(() => {
+        // startup is fine, clear timeout
+        window.clearTimeout(timeout);
+      })
+    }
+    let isWindow = window.isChromeWindow;
+    
+    // Inject scripts to window
+    if(yPref.get(PREF_ENABLED)){
+      const disabledScripts = (yPref.get(PREF_SCRIPTSDISABLED) || '').split(",");
+      for(let script of this.scripts){
+        if(script.inbackground){
+          continue
         }
-      }
-      
-      // Add simple script menu to menubar tools popup
-      const menu = document.querySelector(
-        APP_VARIANT.FIREFOX ? "#menu_openDownloads" : "menuitem#addressBook");
-      if(isWindow && menu){
-        window.MozXULElement.insertFTLIfNeeded("toolkit/about/aboutSupport.ftl");
-        let menuFragment = window.MozXULElement.parseXULToFragment(`
-          <menu id="userScriptsMenu" label="userScripts">
-            <menupopup id="menuUserScriptsPopup" onpopupshown="_ucUtils.updateMenuStatus(this)">
-              <menuseparator></menuseparator>
-              <menuitem id="userScriptsRestart" label="Restart" oncommand="_ucUtils.restart(false)" tooltiptext="Toggling scripts requires restart"></menuitem>
-              <menuitem id="userScriptsClearCache" label="Restart and clear startup cache" oncommand="_ucUtils.restart(true)" tooltiptext="Toggling scripts requires restart"></menuitem>
-            </menupopup>
-          </menu>
-        `);
-        const itemsFragment = window.MozXULElement.parseXULToFragment("");
-        for(let script of this.scripts){
-          itemsFragment.append(
-            window.MozXULElement.parseXULToFragment(`
-              <menuitem type="checkbox"
-                        label="${escapeXUL(script.name || script.filename)}"
-                        filename="${escapeXUL(script.filename)}"
-                        checked="true"
-                        oncommand="_ucUtils.toggleScript(this)">
-              </menuitem>
-          `)
-          );
+        if(!disabledScripts.includes(script.filename)){
+          script.tryLoadIntoWindow(window)
         }
-        menuFragment.getElementById("menuUserScriptsPopup").prepend(itemsFragment);
-        menu.parentNode.insertBefore(menuFragment,menu);
-        
-        document.l10n.formatValues(["restart-button-label","clear-startup-cache-label"])
-        .then(values => {
-          let baseTitle = `${values[0]} ${utils.brandName}`;
-          document.getElementById("userScriptsRestart").setAttribute("label", baseTitle);
-          document.getElementById("userScriptsClearCache").setAttribute("label", values[1].replace("…","") + " & " + baseTitle);
-        })
       }
     }
+    if(window.isChromeWindow){
+      this.maybeAddScriptMenuItemsToWindow(window);
+    }
   }
+  // Add simple script menu to menubar tools popup
+  maybeAddScriptMenuItemsToWindow(window){
+    const document = window.document;
+    const menu = document.querySelector(
+      APP_VARIANT.FIREFOX ? "#menu_openDownloads" : "menuitem#addressBook");
+    if(!menu){
+      // this probably isn't main browser window so we don't have suitable target menu
+      return
+    }
+    window.MozXULElement.insertFTLIfNeeded("toolkit/about/aboutSupport.ftl");
+    let menuFragment = window.MozXULElement.parseXULToFragment(`
+      <menu id="userScriptsMenu" label="userScripts">
+        <menupopup id="menuUserScriptsPopup" onpopupshown="_ucUtils.updateMenuStatus(this)">
+          <menuseparator></menuseparator>
+          <menuitem id="userScriptsRestart" label="Restart" oncommand="_ucUtils.restart(false)" tooltiptext="Toggling scripts requires restart"></menuitem>
+          <menuitem id="userScriptsClearCache" label="Restart and clear startup cache" oncommand="_ucUtils.restart(true)" tooltiptext="Toggling scripts requires restart"></menuitem>
+        </menupopup>
+      </menu>
+    `);
+    const itemsFragment = window.MozXULElement.parseXULToFragment("");
+    for(let script of this.scripts){
+      itemsFragment.append(
+        window.MozXULElement.parseXULToFragment(`
+          <menuitem type="checkbox"
+                    label="${escapeXUL(script.name || script.filename)}"
+                    filename="${escapeXUL(script.filename)}"
+                    checked="true"
+                    oncommand="_ucUtils.toggleScript(this)">
+          </menuitem>
+      `)
+      );
+    }
+    menuFragment.getElementById("menuUserScriptsPopup").prepend(itemsFragment);
+    menu.parentNode.insertBefore(menuFragment,menu);
+    document.l10n.formatValues(["restart-button-label","clear-startup-cache-label"])
+    .then(values => {
+      let baseTitle = `${values[0]} ${utils.brandName}`;
+      document.getElementById("userScriptsRestart").setAttribute("label", baseTitle);
+      document.getElementById("userScriptsClearCache").setAttribute("label", values[1].replace("…","") + " & " + baseTitle);
+    })
+  }
+  
+  observe(aSubject, aTopic, aData) {
+    aSubject.addEventListener('DOMContentLoaded', this, true);
+  }
+  
+  handleEvent(aEvent){
+    switch (aEvent.type){
+      case "DOMContentLoaded":
+        this.onDOMContent(aEvent.originalTarget);
+        break;
+      default:
+        console.warn(new Error("unexpected event received",{cause:aEvent}));
+    }
+  }
+  
 }
 
 const _ucjs = !Services.appinfo.inSafeMode && new UserChrome_js();
