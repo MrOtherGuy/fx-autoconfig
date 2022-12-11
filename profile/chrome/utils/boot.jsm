@@ -315,7 +315,9 @@ const utils = {
       }else{
         itemStyle += "background: transparent center no-repeat ";
       }
-      itemStyle += `url(chrome://userChrome/content/${desc.image});`;
+      itemStyle += /^chrome:\/\/|resource:\/\//.test(desc.image)
+        ? `url(${desc.image});`
+        : `url(chrome://userChrome/content/${desc.image});`;
       itemStyle += desc.style || "";
     }
     SHARED_GLOBAL.widgetCallbacks.set(desc.id,desc.callback);
@@ -323,6 +325,7 @@ const utils = {
     return CUI.createWidget({
       id: desc.id,
       type: 'custom',
+      defaultArea: desc.area || CUI.AREA_NAVBAR,
       onBuild: function(aDocument) {
         let toolbaritem = aDocument.createXULElement(desc.type);
         let props = {
