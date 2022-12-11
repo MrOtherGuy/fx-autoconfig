@@ -25,18 +25,18 @@
   "utils_tests.uc.js"
   ];
   console.info("%crunning tests...","color: rgb(120,160,240)");
-
+  const PROMISES = [
   // Can we read data from sharedGlobal
   new Test(
     "sharedGlobal",
     () => { return _ucUtils.sharedGlobal.test_utils.x }
-  ).expect(SHARED_GLOBAL_TEST_X);
+  ).expect(SHARED_GLOBAL_TEST_X),
 
   // Does _ucUtils give us correct brandName
   new Test(
     "brandName",
     () => { return _ucUtils.brandName }
-  ).expect(BRAND_NAME);
+  ).expect(BRAND_NAME),
 
   // calling createElement() without third argument should create a xul element
   new Test(
@@ -49,7 +49,7 @@
       );
       return node.outerHTML;
     }
-  ).expect('<vbox xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" class="test-vbox" hidden="true"/>');
+  ).expect('<vbox xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" class="test-vbox" hidden="true"/>'),
 
   // calling createElement() with third argument should create html element
   new Test(
@@ -63,15 +63,51 @@
       );
       return node.outerHTML;
     }
-  ).expect('<div xmlns="http://www.w3.org/1999/xhtml" class="test-div" hidden="true"></div>');
+  ).expect('<div xmlns="http://www.w3.org/1999/xhtml" class="test-div" hidden="true"></div>'),
 
-  // TODO createWidget
+  // Test if widget is created by inspecting if it has expected fill style
+  new Test(
+    "createWidget",
+    () => {
+      return new Promise((resolve, reject) => {
+        const widgetID = "test-widget-too";
+        
+        const listener = {
+          onWidgetAfterDOMChange: (aNode) => {
+            if(aNode.id === widgetID){
+              window.CustomizableUI.removeListener(listener);
+              try{
+                resolve(window.getComputedStyle(aNode.icon).fill)
+              }catch(ex){
+                reject(ex)
+              }
+            }
+          }
+        };
+        window.CustomizableUI.addListener(listener);
+        
+        let widget = _ucUtils.createWidget({
+          id: widgetID,
+          type: "toolbarbutton",
+          label: "my-widget-label-too",
+          tooltip: "test-tooltip",
+          class: "test-button",
+          image: "chrome://browser/skin/bookmark-star-on-tray.svg",
+          style: "--toolbarbutton-icon-fill: #f0f; color: #f0f;",
+          callback: function(ev,win){
+            console.log(win.document.title)
+          }
+        });
+        
+      });
+    }
+  ).expectAsync("rgb(255, 0, 255)"),
 
   // Synchronously read file content with string argument treated as relative path
   new Test(
     "readFileFromString",
     () => { return _ucUtils.readFile("test_file.txt") }
-  ).expect("This is a test file used in testing");
+  ).expect("This is a test file used in testing"),
 
   // Synchronously read file content with reference to File object
   new Test("readFileFromFile",
@@ -79,13 +115,13 @@
       let file = _ucUtils.getFSEntry("test_file.txt");
       return _ucUtils.readFile(file);
     }
-  ).expect("This is a test file used in testing");
+  ).expect("This is a test file used in testing"),
 
   // Async file read with string argument as relative path
   new Test(
     "readFileAsync",
     () => { return _ucUtils.readFileAsync("test_file.txt") }
-  ).expectAsync("This is a test file used in testing");
+  ).expectAsync("This is a test file used in testing"),
 
   // Async file read as json
   new Test(
@@ -97,7 +133,7 @@
         .catch(reject)
       })
     }
-  ).expectAsync("This is a test file used in testing");
+  ).expectAsync("This is a test file used in testing"),
 
   // Write some content to text file
   new Test(
@@ -112,7 +148,7 @@
         .catch(reject)
       })
     }
-  ).expectAsync("test file content: 17");
+  ).expectAsync("test file content: 17"),
 
   // List names of files in a directory
   new Test("listFileNames",
@@ -127,7 +163,7 @@
       }
       return names.join(",");
     }
-  ).expect(TEST_FILES.join(","));
+  ).expect(TEST_FILES.join(",")),
 
   // TODO createFileURI
 
@@ -145,12 +181,12 @@
       }
       return names.join(",");
     }
-  ).expect("resources,tests,utils");
+  ).expect("resources,tests,utils"),
 
   // Get File object from file name
   new Test(
     "getFSEntry", () => { return _ucUtils.getFSEntry("test_file.txt") != null }
-  ).expect(true);
+  ).expect(true),
 
   // return list of script names in directory (not file names)
   // Note: aaa_test_script.uc.js does not have a name so it should be first
@@ -163,7 +199,7 @@
                     .join(",")
       return scripts.length + ";" + names
     }
-  ).expect(TEST_FILES.length+";,test_module_script,test_module_script_ESM,test_runner,test_utils");
+  ).expect(TEST_FILES.length+";,test_module_script,test_module_script_ESM,test_runner,test_utils"),
 
   // Tests load order.
   // The current script (this one) should be false.
@@ -179,7 +215,7 @@
               .map(a => a.isRunning)
               .join(",");
     }
-  ).expect("false,true,true,true,false");
+  ).expect("false,true,true,true,false"),
 
   // Can get reference to first browser-window window-object
   new Test(
@@ -187,12 +223,12 @@
     () => {
       return _ucUtils.windows.get()[0].AppConstants.MOZ_APP_BASENAME;
     }
-  ).expect("Firefox");
+  ).expect((val) => val === "Firefox"),
 
   // TODO togglescript
 
   // Set the pref to false (if it wasn't already) for the following tests
-  _ucUtils.prefs.set("userChromeJS.allowUnsafeWrites",false);
+  Promise.resolve(_ucUtils.prefs.set("userChromeJS.allowUnsafeWrites",false)),
 
   // Writing outside of resources directory should fail because pref is disabled
   new Test(
@@ -200,7 +236,7 @@
     () => {
       return _ucUtils.writeFile("../userChrome.css","#nav-bar{ background: #f00 !important; }")
     }
-  ).expectError();
+  ).expectError(),
 
   // Set pref to allow writing outside of resources directory, and then write userChrome.css
   new Test(
@@ -222,7 +258,7 @@
         .catch(reject)
       })
     }
-  ).expectAsync("rgb(255, 0, 0) : rgb(187, 170, 85)");
+  ).expectAsync("rgb(255, 0, 0) : rgb(187, 170, 85)"),
 
   // TODO updateMenuStatus
 
@@ -236,7 +272,7 @@
         .then(() => resolve(42))
       })
     }
-  ).expectAsync(42);
+  ).expectAsync((val) => val === 42),
 
   // Has current window object been fully restored 
   new Test(
@@ -248,7 +284,7 @@
         .then(() => resolve(42))
       })
     }
-  ).expectAsync(42);
+  ).expectAsync(42),
 
   new Test(
     "registerHotkey",
@@ -266,7 +302,7 @@
       let key = document.getElementById("myHotkey");
       return key.getAttribute("modifiers") + "," + key.getAttribute("key");
     }
-  ).expect("accel,shift,Y");
+  ).expect("accel,shift,Y"),
 
   // TODO loadURI
 
@@ -294,7 +330,7 @@
         ).catch(reject)
       })
     }
-  ).expectAsync("restart canceled");
+  ).expectAsync("restart canceled"),
   
   /**
    * ! Keep these below as the last tests ! 
@@ -327,6 +363,14 @@
       }
     ).expectError()
   })
-  .then(Test.logResults);
+  
+  ];
+  Promise.race([Test.rejectOnTimeout(8000),Promise.allSettled(PROMISES)])
+  .then(Test.logResults)
+  .catch(()=>{
+    Test.logResults();
+    console.error("Test run failed to settle before timeout!");
+  })
+  
   
 })();
