@@ -9,12 +9,21 @@ class Result{
     this.expected = test.expected;
     this.value = test.value;
     this.name = test.name;
+    this.disabled = false;
   }
   static From(test){
+    if(typeof test.expected === "function"){
+      return test.expected(test.value) === true
+        ? new Success(test)
+        : new Failure(test)
+    }
     if( test.value === test.expected ){
       return new Success( test )
     }
     return new Failure( test )
+  }
+  log(){
+    console.info(`%c${this.name}: test was skipped`,"color: dodgerblue")
   }
 }
 
@@ -23,7 +32,8 @@ class Failure extends Result{
     super(test);
   }
   log(){
-    console.warn(`${this.name} failed: expected: ${this.expected} - got: ${this.value}`);
+    let expected = (typeof this.expected === "function") ? "<function>" : this.expected;
+    console.warn(`${this.name} failed: expected: ${expected} - got: ${this.value}`);
   }
 }
 
@@ -46,6 +56,10 @@ class Test{
   exec(){
     return this.fun();
   }
+  disable(){
+    this.disabled = true;
+    return this
+  }
   expectAsync(expect){
     this.expected = expect;
     return Test.runnerAsync(this)
@@ -67,6 +81,9 @@ class Test{
     return {}
   }
   static runner(test){
+    if(test.disabled){
+      RESULTS.push( new Result(test) )
+    }
     try{
       test.value = test.exec();
       RESULTS.push( Result.From(test) )
@@ -79,6 +96,9 @@ class Test{
     return {}
   }
   static async runnerAsync(test){
+    if(test.disabled){
+      RESULTS.push( new Result(test) )
+    }
     try{
       test.value = await test.exec();
       RESULTS.push( Result.From(test) )
@@ -98,6 +118,11 @@ class Test{
   static createTimeoutLong(){
     return new Promise(res => {
       setTimeout(res,4000)
+    })
+  }
+  static rejectOnTimeout(millis){
+    return new Promise((_,reject)=>{
+      setTimeout(reject,millis)
     })
   }
   static logResults(){
