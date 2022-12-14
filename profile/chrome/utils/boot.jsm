@@ -846,7 +846,6 @@ class UserChrome_js{
         window.clearTimeout(timeout);
       })
     }
-    let isWindow = window.isChromeWindow;
     
     // Inject scripts to window
     if(yPref.get(PREF_ENABLED)){
