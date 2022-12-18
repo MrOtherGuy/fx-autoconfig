@@ -170,15 +170,36 @@ class ScriptData {
   }
   
   getInfo(){
-    let info = {...this};
-    info.regex = new RegExp(this.regex.source,this.regex.flags);
-    return info;
+    return ScriptInfo.fromScript(this,this.isEnabled);
   }
   
   static fromFile(aFile){
     const headerText = utils.readFile(aFile,true)
     .match(/^\/\/ ==UserScript==\s*\n(?:.*\n)*?\/\/ ==\/UserScript==\s*\n/m);
     return new ScriptData(aFile.leafName, headerText ? headerText[0] : '');
+  }
+  
+}
+
+// _ucUtils.getScriptData() returns these types of objects
+class ScriptInfo{
+  constructor(enabled){
+    this.isEnabled = enabled
+  }
+  asFile(){
+    return getDirEntry(this.filename, true);
+  }
+  static fromScript(aScript, isEnabled){
+    let info = new ScriptInfo(isEnabled);
+    Object.assign(info,aScript);
+    info.regex = new RegExp(aScript.regex.source, aScript.regex.flags);
+    return info
+  }
+  static fromString(aName, aString) {
+    const headerText = aString
+    .match(/^\/\/ ==UserScript==\s*\n(?:.*\n)*?\/\/ ==\/UserScript==\s*\n/m);
+    const scriptData = new ScriptData(aName, headerText ? headerText[0] : '');
+    return ScriptInfo.fromScript(scriptData, false)
   }
 }
 
@@ -453,14 +474,10 @@ const utils = {
   getFSEntry: (fileName) => ( getDirEntry(fileName) ),
   
   getScriptData: () => {
-    let scripts = [];
     const disabledScripts = (yPref.get(PREF_SCRIPTSDISABLED) || '').split(",");
-    for(let script of _ucjs.scripts){
-      let scriptInfo = script.getInfo();
-      scriptInfo.isEnabled = !disabledScripts.includes(script.filename);
-      scripts.push(scriptInfo);
-    }
-    return scripts
+    return _ucjs.scripts.map(
+      (script) => ScriptInfo.fromScript(script,!disabledScripts.includes(script.filename))
+    );
   },
   
   get windows(){
@@ -699,7 +716,9 @@ const utils = {
       return true
     }
     return false
-  }
+  },
+  
+  parseStringAsScriptInfo: (aName, aString) => ScriptInfo.fromString(aName, aString)
 }
 
 Object.freeze(utils);
