@@ -96,6 +96,7 @@ class ScriptData {
     this.description = headerText.match(/\/\/ @description\s+(.+)\s*$/im)?.[1];
     this.version = headerText.match(/\/\/ @version\s+(.+)\s*$/im)?.[1];
     this.author = headerText.match(/\/\/ @author\s+(.+)\s*$/im)?.[1];
+    this.icon = headerText.match(/\/\/ @icon\s+(.+)\s*$/im)?.[1];
     this.homepageURL = headerText.match(/\/\/ @homepageURL\s+(.+)\s*$/im)?.[1];
     this.downloadURL = headerText.match(/\/\/ @downloadURL\s+(.+)\s*$/im)?.[1];
     this.updateURL = headerText.match(/\/\/ @updateURL\s+(.+)\s*$/im)?.[1];
