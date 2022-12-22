@@ -93,7 +93,9 @@ class ScriptData {
     this.filename = leafName;
     this.name = headerText.match(/\/\/ @name\s+(.+)\s*$/im)?.[1];
     this.charset = headerText.match(/\/\/ @charset\s+(.+)\s*$/im)?.[1];
-    this.description = headerText.match(/\/\/ @description\s+(.+)\s*$/im)?.[1];
+    this.description = headerText
+      .match(/\/\/ @description\s+(.+?)[\r\n]+\/\/ [@=]+/is)
+      ?.[1].replace(/^\/\/ */gm,"");
     this.version = headerText.match(/\/\/ @version\s+(.+)\s*$/im)?.[1];
     this.author = headerText.match(/\/\/ @author\s+(.+)\s*$/im)?.[1];
     this.icon = headerText.match(/\/\/ @icon\s+(.+)\s*$/im)?.[1];

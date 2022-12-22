@@ -1,6 +1,12 @@
 // ==UserScript==
 // @name           test_utils
 // @onlyonce
+// @description    This file is used to run various tests where main purpose 
+// is to test APIs provided by _ucUtils.
+//
+// Above line is left empty on purpose to test multi-line descriptions.
+// 
+// Above line is also left empty
 // @loadOrder 5
 // ==/UserScript==
 
@@ -216,7 +222,20 @@
               .join(",");
     }
   ).expect("false,true,true,true,false"),
-
+  
+  // test multi-line script descriptions
+  new Test(
+    "multi-line script descriptions",
+    () => {
+      let scripts = _ucUtils.getScriptData();
+      let thisScript = scripts.find( script => script.name === "test_utils" );
+      return thisScript ? thisScript.description.split("\n") : [];
+    }
+  ).expect(lines => {
+    return lines.length === 6
+        && lines[lines.length - 1] === "Above line is also left empty";
+  }),
+  
   // Can get reference to first browser-window window-object
   new Test(
     "getWindows",
