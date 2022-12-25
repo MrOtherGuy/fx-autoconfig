@@ -2,7 +2,7 @@
 // @name           test_runner
 // ==/UserScript==
 
-const { setTimeout } = ChromeUtils.import("resource://gre/modules/Timer.jsm");
+import { setTimeout } from "resource://gre/modules/Timer.sys.mjs";
 
 class Result{
   constructor(test){
