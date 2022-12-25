@@ -33,7 +33,7 @@ class Failure extends Result{
   }
   log(){
     let expected = (typeof this.expected === "function") ? "<function>" : this.expected;
-    console.warn(`${this.name} failed: expected: ${expected} - got: ${this.value}`);
+    console.warn(`${this.name} failed: expected:\n${expected}\ngot:\n${this.value}`);
   }
 }
 
