@@ -23,6 +23,8 @@
   _ucUtils.sharedGlobal.test_utils = { x: SHARED_GLOBAL_TEST_X };
 
   // Needs to be alphabetical
+  // This should only include files that are actually runnable tests
+  // so no empty files or files with invalid name
   const TEST_FILES = [
   "000_test_runner.sys.mjs",
   "aaa_test_script.uc.js",
@@ -159,7 +161,7 @@
   // List names of files in a directory
   new Test("listFileNames",
     () => {
-      let files = _ucUtils.getFSEntry("../tests/");
+      let files = _ucUtils.getFSEntry("../");
       let names = [];
       while(files.hasMoreElements()){
         let file = files.getNext().QueryInterface(Ci.nsIFile);
@@ -169,7 +171,7 @@
       }
       return names.join(",");
     }
-  ).expect(TEST_FILES.join(",")),
+  ).expect("userChrome.css"),
 
   // TODO createFileURI
 
