@@ -818,7 +818,7 @@ class UserChrome_js{
     let files = getDirEntry('',true);
     while(files.hasMoreElements()){
       let file = files.getNext().QueryInterface(Ci.nsIFile);
-      if (/(.+\.uc\.js)|(.+\.sys\.mjs)$/i.test(file.leafName)) {
+      if (/(.+\.uc\.js|.+\.sys\.mjs)$/i.test(file.leafName)) {
         let script = ScriptData.fromFile(file);
         this.scripts.push(script);
         if(script.inbackground && script.isEnabled){
