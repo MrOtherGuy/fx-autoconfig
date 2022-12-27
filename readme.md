@@ -83,6 +83,7 @@ The startup-cache folder can be found as follows:
 0. Run Firefox
 
 (Note) If you wish to set up a profile that doesn't use normal profile directories (i.e one that was lauched with command-line such as `firefox.exe -profile "C:\test\testprofile"` or with portable-apps launcher) then the startupCache folder will be in the profile root folder.
+
 </details>
 
 # Usage
@@ -169,6 +170,7 @@ let EXPORTED_SYMBOLS = [];
 // actual script here
 
 ```
+
 Alternatively, you can name your script with `.sys.mjs` file extension in which case the loader automatically treats it as backgroundmodule.
 
 Note that the `EXPORTED_SYMBOLS` array like above in module global scope is mandatory in `.uc.js` scripts.
@@ -234,7 +236,7 @@ Note: All Scripts marked as `backgroundmodule` will have load-order `-1`
 
 ## General
 
-### _ucUtils.createElement(document,tagname,attributes,isHTML) -> Element
+### \_ucUtils.createElement(document,tagname,attributes,isHTML) -> Element
 
 ```js
 _ucUtils.createElement(document,"menuitem",{ id:"someid", class:"aClass", label:"some label" })
@@ -242,7 +244,7 @@ _ucUtils.createElement(document,"menuitem",{ id:"someid", class:"aClass", label:
 
 Attaches a new element with tagname to the given document and adds it attributes from attributes object. isHTML is a boolean indicating whether the element is XUL element or HTML element - defaults to false.
 
-### _ucUtils.createWidget(details) -> `<Widget wrapper object>` (or null on failure)
+### \_ucUtils.createWidget(details) -> `<Widget wrapper object>` (or null on failure)
 
 ```js
 _ucUtils.createWidget({
@@ -275,7 +277,7 @@ The **allEvents** property defines if the callback should be called for all clic
 The **image** is loaded from `resources` folder so save your icon files there.
 
 
-### _ucUtils.registerHotkey(details,function) -> Boolean
+### \_ucUtils.registerHotkey(details,function) -> Boolean
 
 ```js
 // description for hotkey Ctrl + Shift + G
@@ -306,7 +308,7 @@ The created hotkey will override built-in hotkeys.
 The id field in the details object should have some unique value, but this is not enforced.
 
 
-### _ucUtils.getScriptdata() -> Array
+### \_ucUtils.getScriptdata() -> Array
 
 ```js
 let scripts = _ucUtils.getScriptdata();
@@ -317,17 +319,17 @@ for(let script of scripts){
 
 Returns the currently loaded script files with a copy of their metadata.
 
-### _ucUtils.windows -> Object
+### \_ucUtils.windows -> Object
 
 Returns an object to interact with windows with two properties
 
-#### _ucUtils.windows.get(onlyBrowsers) -> Array
+#### \_ucUtils.windows.get(onlyBrowsers) -> Array
 
 Return a list of handles for each window object for this firefox instance. If `onlyBrowsers` is `true` then this only includes browser windows. If it's `false` then it also includes consoles, PiP, non-native notifications etc.
 
 `onlyBrowsers` defaults to `true`.
 
-#### _ucUtils.windows.forEach(function,onlyBrowsers)
+#### \_ucUtils.windows.forEach(function,onlyBrowsers)
 
 ```js
 _ucUtils.windows.forEach((document,window) => console.log(document.location), false)
@@ -337,7 +339,7 @@ Runs the specified function for each window. The function will be given two argu
 
 **Note!** `_ucUtils` may not be available on all target window objects if onlyBrowsers is `false`. The callback function should check for it's availability when called that way.
 
-### _ucUtils.toggleScript(fileName or element) -> Object or null
+### \_ucUtils.toggleScript(fileName or element) -> Object or null
 
 filename:
 
@@ -355,7 +357,7 @@ If the argument is an element the function reads a `filename` attribute from the
 
 The return value is `null` if a matching script was not found. Otherwise, the return value is an object `{ script: filename, enabled: true|false }`
 
-### _ucUtils.loadURI(window,details) -> boolean
+### \_ucUtils.loadURI(window,details) -> boolean
 
 ```js
 _ucUtils.loadURI(window,{
@@ -371,11 +373,11 @@ _ucUtils.loadURI(window,{
 
 Return a boolean indicating if the operation was successful. "url" and "where" properties are mandatory - others are optional. 
 
-### _ucUtils.restart(clearCache)
+### \_ucUtils.restart(clearCache)
 
 Immediately restart the browser. If the boolean clearCache is true then Firefox will invalidate startupCache which allows changes to the enabled scripts to take effect.
 
-### _ucUtils.startupFinished() -> Promise
+### \_ucUtils.startupFinished() -> Promise
 
 ```js
 _ucUtils.startupFinished()
@@ -386,7 +388,7 @@ _ucUtils.startupFinished()
 
 Returns a promise that will be resolved when all windows have been restored during session startup. If all windows have already been restored at the time of calling the promise will be resolved immediately.
 
-### _ucUtils.windowIsReady() -> Promise
+### \_ucUtils.windowIsReady() -> Promise
 
 ```js
 _ucUtils.windowIsReady(window)
@@ -401,7 +403,7 @@ _ucUtils.windowIsReady(window)
 
 Since scripts run per window, `startupFinished` will be resolved once in *each window that called it* when ALL those windows have been restored. But `windowIsReady` will be resolved whenever the particular window that calls it has started up.
 
-### _ucUtils.showNotification(details) -> Promise
+### \_ucUtils.showNotification(details) -> Promise
 
 ```js
 _ucUtils.showNotification(
@@ -424,7 +426,7 @@ If `tab` key exists then the notification will be shown in that tab only. Otherw
 
 See more about `buttons` and `callback` keys at [notificationbox.js](https://searchfox.org/mozilla-central/rev/3f782c2587124923a37c750b88c5a40108077057/toolkit/content/widgets/notificationbox.js#113)
 
-### _ucUtils.updateStyleSheet(name, sheet_mode) -> boolean
+### \_ucUtils.updateStyleSheet(name, sheet_mode) -> boolean
 
 ```js
 _ucUtils.updateStyleSheet() // reloads userChrome.css
@@ -448,7 +450,7 @@ If the specified stylesheet imports other files, then calling this will also rel
 
 A shortcut for reading and writing preferences
 
-### _ucUtils.prefs.set(prefName,value) -> value
+### \_ucUtils.prefs.set(prefName,value) -> value
 
 ```js
 _ucUtils.prefs.set("some.pref.path","test");
@@ -457,11 +459,11 @@ _ucUtils.prefs.set("some.other.pref",300);
 
 Returns a new value on success, undefined if pref couldn't be set
 
-### _ucUtils.prefs.get(prefName) -> value
+### \_ucUtils.prefs.get(prefName) -> value
 
 Returns the value of the pref, undefined if it doesn't exist
 
-### _ucUtils.prefs.addListener(prefName,callback) -> Object
+### \_ucUtils.prefs.addListener(prefName,callback) -> Object
 
 ```js
 let callback = (value,pref) => (console.log(`${pref} changed to ${value}`))
@@ -470,7 +472,7 @@ let prefListener = _ucUtils.prefs.addListener("userChromeJS",callback);
 
 Note that the callback will be invoked when any pref that starts with `userChromeJS` is changed. The pref in callback argument will be the actual pref whose value changed.
 
-### _ucUtils.prefs.removeListener(listener)
+### \_ucUtils.prefs.removeListener(listener)
 
 ```
 _ucUtils.prefs.removeListener(prefListener) // from above example
@@ -482,13 +484,15 @@ Scripts should generally use the `resources` folder for their files. The helper 
 
 The resources folder is registered to chrome:// scheme so scripts and stylesheets can use the following URL to access files within it:
 
-    "chrome://userChrome/content/<filename>.txt" 
+```
+"chrome://userChrome/content/<filename>.txt" 
+```
 
 Scripts folder is registered to: `chrome://userScripts/content/`
 
 The loader module folder is registered to `chrome://userchromejs/content/`
 
-### _ucUtils.getFSEntry(fileName) -> fileHandle || enumerator for entries in a folder
+### \_ucUtils.getFSEntry(fileName) -> fileHandle || enumerator for entries in a folder
 
 Get file handle for resources/some.txt:
 
@@ -506,7 +510,7 @@ while(contents.hasMoreElements()){
 }
 ```
 
-### _ucUtils.readFile(<fileHandle or string>,metaOnly) -> String
+### \_ucUtils.readFile(\<fileHandle or string\>,metaOnly) -> String
 
 ```js
 _ucUtils.readFile(aFile,false)
@@ -523,7 +527,7 @@ Attempts to read the content of the given fileHandle as text. Boolean metaOnly i
 
 When first argument is a string, the filename is parsed as being relative to the **resources** directory.
 
-### _ucUtils.readFileAsync(fileName) -> Promise <filecontent>
+### \_ucUtils.readFileAsync(fileName) -> Promise \<filecontent\>
 
 ```js
 
@@ -544,7 +548,7 @@ _ucUtils.readFileAsync("../userChrome.css")
 
 Asynchronous file reading. Filename must be a string corresponding to a file relative to **resources** directory. Promise is rejected if file isn't found.
 
-### _ucUtils.readJSON(fileName) -> Promise <Object>
+### \_ucUtils.readJSON(fileName) -> Promise \<Object\>
 
 ```js
 _ucUtils.readJSON("some.json")
@@ -555,7 +559,7 @@ _ucUtils.readJSON("some.json")
 
 A wrapper for `_ucUtils.readFileAsync` which tries to parse the file contents as JSON.
 
-### _ucUtils.writeFile( fileName, content, [options] ) -> Promise <Number>
+### \_ucUtils.writeFile( fileName, content, \[options\] ) -> Promise \<Number\>
 
 ```js
 let some_content = "Hello world!\n";
@@ -573,7 +577,7 @@ By default writing files using this API is only allowed in **resources** directo
 
 The optional `options` argument is currently only used to pass a filename for temp file. By default it is derived from fileName. 
 
-### _ucUtils.createFileURI(fileName) -> String
+### \_ucUtils.createFileURI(fileName) -> String
 
 ```js
 _ucUtils.createFileURI("path\some.png")
@@ -581,7 +585,7 @@ _ucUtils.createFileURI("path\some.png")
 
 Return a valid file uri describing `<profileDir>\chrome\resources\path\some.png`
 
-### _ucUtils.chromeDir
+### \_ucUtils.chromeDir
 
 Returns an object with two properties
 
