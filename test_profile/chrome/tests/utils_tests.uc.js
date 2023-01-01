@@ -1,12 +1,16 @@
 // ==UserScript==
 // @name           test_utils
 // @onlyonce
-// @description    This file is used to run various tests where main purpose 
-// is to test APIs provided by _ucUtils.
-//
-// Above line is left empty on purpose to test multi-line descriptions.
-// 
-// Above line is also left empty
+// @long-description
+// @description
+/*
+This file is used to run various tests where main purpose
+is to test APIs provided by _ucUtils.
+
+Above line is left empty on purpose to test multi-line descriptions.
+ 
+Above line is also left empty
+*/
 // @loadOrder 5
 // ==/UserScript==
 
@@ -193,7 +197,8 @@
 
   // Get File object from file name
   new Test(
-    "getFSEntry", () => { return _ucUtils.getFSEntry("test_file.txt") != null }
+    "getFSEntry",
+    () => { return _ucUtils.getFSEntry("test_file.txt") != null }
   ).expect(true),
 
   // return list of script names in directory (not file names)
@@ -225,13 +230,48 @@
     }
   ).expect("false,true,true,true,false"),
   
+  // Test invalid getScriptData() filter 1
+  new Test(
+    "expectError_unsupportedScriptDataFilterNumber",
+    () => _ucUtils.getScriptData(123)
+  ).expectError(),
+  
+  // Test invalid getScriptData() filter 2
+  new Test(
+    "expectError_unsupportedScriptDataFilterObject",
+    () => _ucUtils.getScriptData({})
+  ).expectError(),
+  
+  // Test getting single ScriptInfo object
+  new Test(
+    "getSingleScriptInfo",
+    () => _ucUtils.getScriptData("test_module_script.sys.mjs").name
+  ).expect("test_module_script_ESM"),
+  
+  // Test getting non-existing ScriptInfo object
+  new Test(
+    "getNonExistingScriptInfo",
+    () => _ucUtils.getScriptData("non-existing-name")
+  ).expect(null),
+  
+  // Test getting ScriptInfo from filter function
+  new Test(
+    "getScriptInfoWithFilter",
+    () => _ucUtils.getScriptData(s => s.inbackground).length
+  ).expect(3),
+  
+  // test single-line script descriptions
+  new Test(
+    "single-line script descriptions",
+    () => _ucUtils.getScriptData("000_test_runner.sys.mjs")?.description
+  ).expect("module which runs and logs test results"),
+  
   // test multi-line script descriptions
   new Test(
     "multi-line script descriptions",
     () => {
-      let scripts = _ucUtils.getScriptData();
-      let thisScript = scripts.find( script => script.name === "test_utils" );
-      return thisScript ? thisScript.description.split("\n") : [];
+      let script = _ucUtils.getScriptData("utils_tests.uc.js");
+      return script ? script.description.split("\n") : [];
     }
   ).expect(lines => {
     return lines.length === 6

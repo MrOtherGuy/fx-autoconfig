@@ -476,8 +476,21 @@ const utils = {
   
   getFSEntry: (fileName) => ( getDirEntry(fileName) ),
   
-  getScriptData: () => {
+  getScriptData: (aFilter) => {
+    const filterType = typeof aFilter;
+    if(aFilter && !(filterType === "string" || filterType === "function")){
+      throw "getScriptData() called with invalid filter type: "+filterType
+    }
+    if(filterType === "string"){
+      let script = _ucjs.scripts.find(s => s.filename === aFilter);
+      return script ? ScriptInfo.fromScript(script, script.isEnabled) : null;
+    }
     const disabledScripts = (yPref.get(PREF_SCRIPTSDISABLED) || '').split(",");
+    if(filterType === "function"){
+      return _ucjs.scripts.filter(aFilter).map(
+        (script) => ScriptInfo.fromScript(script,!disabledScripts.includes(script.filename))
+      );
+    }
     return _ucjs.scripts.map(
       (script) => ScriptInfo.fromScript(script,!disabledScripts.includes(script.filename))
     );

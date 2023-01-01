@@ -1,5 +1,6 @@
 // ==UserScript==
 // @name           test_runner
+// @description    module which runs and logs test results
 // ==/UserScript==
 
 import { setTimeout } from "resource://gre/modules/Timer.sys.mjs";
