@@ -140,20 +140,6 @@ In addition, scripts can be marked as `@backgroundmodule` in which case they are
 
 Some convenience functions are provided for scripts to use in global `_ucUtils` object available in windows.
 
-## @onlyonce
-
-By default the script is executed once per document it applies to, but this can be changed with `@onlyonce` header in which case the script will only be run in the first document.
-
-```js
-// ==UserScript==
-// @name           example only-once file
-// @onlyonce
-// ==/UserScript==
-
-console.log("Hello world!") // This is only run in the first window that opens.
-
-```
-
 ## @backgroundmodule
 
 Scripts can be marked as background modules by including a `@backgroundmodule` line in script header. See example:
@@ -194,6 +180,35 @@ The manager loads any `.sys.mjs` files always as backgroundmodule - in addition 
 
 You should note that background modules do not have access to window objects when they are being run because they are executed before any window exists. Thus, they also do not get access to `_ucUtils` object.
 
+## @description
+
+The `@description` header can be used to store short description in script meta-data.
+
+```js
+// ==UserScript==
+// @description    simple test script that does nothing
+// ==/UserScript==
+```
+
+### @long-description
+
+Normally `@description` stores the text appearing on the same line as the header itself. However, when `@long-description` is present the description will be a block comment starting from the next line after the `@description` header:
+
+```js
+// ==UserScript==
+// @long-description
+// @description    this-part-is-now-ignored
+/*
+Here goes my long description about this mighty powerful script.
+It does all the things and even more!
+...
+or at least that's the plan, it actually does nothing currently :p
+*/
+// ==/UserScript==
+```
+
+Note that the single-line part of `@description` is now ignored. But you can put something there as fallback value for loaders that don't have multi-line description support.
+
 ## @ignorecache
 
 This header can be used to mark scripts that should not be put into startup-cache. Instead, such scripts are always read from disk when loaded.
@@ -233,6 +248,20 @@ By default scripts have load-order `10`. Scripts with load-order <10 are injecte
 If load-order is not specified then scripts follow normal filename alphabetical ordering.
 
 Note: All Scripts marked as `backgroundmodule` will have load-order `-1`
+
+## @onlyonce
+
+By default the script is executed once per document it applies to, but this can be changed with `@onlyonce` header in which case the script will only be run in the first document.
+
+```js
+// ==UserScript==
+// @name           example only-once file
+// @onlyonce
+// ==/UserScript==
+
+console.log("Hello world!") // This is only run in the first window that opens.
+
+```
 
 ## General
 
@@ -308,16 +337,53 @@ The created hotkey will override built-in hotkeys.
 The id field in the details object should have some unique value, but this is not enforced.
 
 
-### \_ucUtils.getScriptdata() -> Array
+### \_ucUtils.getScriptdata(aFilter) -> Array | ScriptInfo
+
+Returns `ScriptInfo` object(s) with a **copy** of their metadata. This includes scripts that are not yet running or which are disabled by pref.
+
+When called without arguments returns an array of `ScriptInfo` objects describing your scripts.
 
 ```js
-let scripts = _ucUtils.getScriptdata();
+let scripts = _ucUtils.getScriptdata(); 
 for(let script of scripts){
-  console.log(`${script.filename} - ${script.isRunning})
+  console.log(`${script.filename} - @{script.isEnabled} - ${script.isRunning}`)
 }
 ```
 
-Returns the currently loaded script files with a copy of their metadata.
+If the first argument is a `string` then this returns **a single** `ScriptInfo` object for a script that had the specified filename. If such script is not found then `null` is returned.
+
+```js
+let script = _ucUtils.getScriptdata("my-script.uc.js");
+console.log(`@{script.name} - ${script.isRunning}`);
+```
+
+If the first argument is a function, then this function returns a filtered list of scripts that return `true` when the function is run on them:
+
+```js
+let scripts = _ucUtils.getScriptdata(s => s.isRunning);
+console.log(`You have ${scripts.length} running scripts);
+// This is essentially the same as _ucUtils.getScriptdata().filter(s => s.isRunning)
+```
+
+**Note!** If the first argument is anything other than a function or a string, then `getScriptData()` will throw an error.
+
+### \_ucUtils.parseStringAsScriptInfo(aName, aString) -> ScriptInfo
+
+This can be used to construct a `ScriptInfo` object from arbitrary string following the same logic the loader uses internally. When given `aName` as "filename" the `aString` is parsed just like script metadata block in your files.
+
+```js
+let myMetadataBlock = `// ==UserScript==
+// @name           my-test-info
+// @description    Constructed ScriptInfo
+// ==/UserScript==
+`;
+
+let scriptInfo = _ucUtils.parseStringAsScriptInfo("fakeFileName",myMetadataBlock);
+console.log(scriptInfo.name)
+// "my-test-info"
+```
+
+**Note!** There needs to be a new-line after the closing `// ==/UserScript==` "tag" for the metadata to be parsed correctly.
 
 ### \_ucUtils.windows -> Object
 
@@ -375,7 +441,7 @@ Return a boolean indicating if the operation was successful. "url" and "where" p
 
 ### \_ucUtils.restart(clearCache)
 
-Immediately restart the browser. If the boolean clearCache is true then Firefox will invalidate startupCache which allows changes to the enabled scripts to take effect.
+Immediately restart the browser. If the boolean `clearCache` is `true` then Firefox will invalidate startupCache which allows changes to the enabled scripts to take effect.
 
 ### \_ucUtils.startupFinished() -> Promise
 
