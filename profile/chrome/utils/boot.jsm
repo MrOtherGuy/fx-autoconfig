@@ -167,7 +167,7 @@ class ScriptData {
       this.startup && SHARED_GLOBAL[this.startup]._startup(win)
       
     } catch (ex) {
-      console.error(new Error(`@ ${this.filename}`,{cause:ex}));
+      console.error(new Error(`@ ${this.filename}:${ex.lineNumber}`,{cause:ex}));
     }
     return
   }
