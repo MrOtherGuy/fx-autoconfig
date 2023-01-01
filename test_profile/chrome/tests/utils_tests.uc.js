@@ -2,7 +2,7 @@
 // @name           test_utils
 // @onlyonce
 // @long-description
-// @description
+// @description    fallback for loaders without multi-line parsing
 /*
 This file is used to run various tests where main purpose
 is to test APIs provided by _ucUtils.

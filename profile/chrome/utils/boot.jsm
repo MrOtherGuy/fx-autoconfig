@@ -90,12 +90,13 @@ const BASE_FILEURI = Services.io.getProtocolHandler('file')
 
 class ScriptData {
   constructor(leafName, headerText){
+    const hasLongDescription = (/^\/\/\ @long-description/im).test(headerText);
     this.filename = leafName;
     this.name = headerText.match(/\/\/ @name\s+(.+)\s*$/im)?.[1];
     this.charset = headerText.match(/\/\/ @charset\s+(.+)\s*$/im)?.[1];
-    this.description = headerText
-      .match(/\/\/ @description\s+(.+?)[\r\n]+\/\/ [@=]+/is)
-      ?.[1].replace(/^\/\/ */gm,"");
+    this.description = hasLongDescription
+      ? headerText.match(/\/\/ @description\s+.*?\/\*\s*(.+?)\s*\*\//is)?.[1]
+      : headerText.match(/\/\/ @description\s+(.+)\s*$/im)?.[1];
     this.version = headerText.match(/\/\/ @version\s+(.+)\s*$/im)?.[1];
     this.author = headerText.match(/\/\/ @author\s+(.+)\s*$/im)?.[1];
     this.icon = headerText.match(/\/\/ @icon\s+(.+)\s*$/im)?.[1];
