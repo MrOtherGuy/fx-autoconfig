@@ -20,9 +20,33 @@ Above line is also left empty
   
   const BRAND_NAME = "Firefox Nightly";
   const SHARED_GLOBAL_TEST_X = 42;
-
+  const PREF_ALLLOW_UNSAFE = "userChromeJS.allowUnsafeWrites";
+  
   const { Test } = ChromeUtils.importESModule("chrome://userscripts/content/000_test_runner.sys.mjs");
-
+  
+  
+  const PREF_LISTENER = new (function(){
+    let clients = new Set();
+    let listener = _ucUtils.prefs.addListener("userChromeJS",(value, prefName) => {
+      for(let client of clients){
+        client(value,prefName);
+      }
+      clients.clear()
+    });
+    this.listenOnce = (fun) => {
+      clients.add(fun);
+    }
+    this.forgetAboutIt = () => {
+      _ucUtils.prefs.removeListener(listener);
+      listener = null;
+    }
+    this.size = () => clients.size;
+    this.reset = () => {
+      listener && this.forgetAboutIt();
+      clients.clear();
+    }
+  })();
+  
   // Write some stuff to sharedGlobal
   _ucUtils.sharedGlobal.test_utils = { x: SHARED_GLOBAL_TEST_X };
 
@@ -289,7 +313,7 @@ Above line is also left empty
   // TODO togglescript
 
   // Set the pref to false (if it wasn't already) for the following tests
-  Promise.resolve(_ucUtils.prefs.set("userChromeJS.allowUnsafeWrites",false)),
+  Promise.resolve(_ucUtils.prefs.set(PREF_ALLLOW_UNSAFE,false)),
 
   // Writing outside of resources directory should fail because pref is disabled
   new Test(
@@ -298,12 +322,23 @@ Above line is also left empty
       return _ucUtils.writeFile("../userChrome.css","#nav-bar{ background: #f00 !important; }")
     }
   ).expectError(),
-
+  
+  // This test should resolve after updateStyleSheet test has set the allow-unsafe pref to true
+  new Test(
+    "prefChangedToTrue",
+    () => {
+      return new Promise((resolve, reject) => {
+        PREF_LISTENER.listenOnce((val,pref) => resolve(`${pref},${val}`));
+        Test.resolveOnTimeout(2000).then(reject);
+      })
+    }
+  ).expectAsync(PREF_ALLLOW_UNSAFE+",true"),
+  
   // Set pref to allow writing outside of resources directory, and then write userChrome.css
   new Test(
     "updateStyleSheet",
     () => {
-      _ucUtils.prefs.set("userChromeJS.allowUnsafeWrites",true);
+      _ucUtils.prefs.set(PREF_ALLLOW_UNSAFE,true);
       const getNavBarStyle = () => window.getComputedStyle(document.getElementById("nav-bar"));
       
       return new Promise((resolve, reject) => {
@@ -313,7 +348,7 @@ Above line is also left empty
           let oldColor = getNavBarStyle().backgroundColor;
           _ucUtils.writeFile("../userChrome.css","#nav-bar{ background: #ba5 !important; }")
           .then(() => _ucUtils.updateStyleSheet())
-          .then(Test.createTimeout) // necessary because the style may not be applied immediately
+          .then(()=>Test.resolveOnTimeout(2000)) // necessary because the style may not be applied immediately
           .then( () => resolve(oldColor + " : " + getNavBarStyle().backgroundColor) )
         })
         .catch(reject)
@@ -384,7 +419,7 @@ Above line is also left empty
         
         Services.obs.addObserver(cancelObserver, "quit-application-requested");
         
-        Test.createTimeout()
+        Test.resolveOnTimeout(2000)
         .then(_ucUtils.restart)
         .then(
           some => resolve( `${reason} ${some ? "succeeded" : "canceled"}` )
@@ -400,11 +435,25 @@ Above line is also left empty
    * The above test setup sets pref to allow writing outside of resources
    * so this should succeed.
    */
+   
+   // This test should resolve after timeout because pref listener was removed
+  new Test(
+    "prefNotChangedToFalse",
+    () => {
+      return new Promise((resolve, reject) => {
+        PREF_LISTENER.listenOnce(reject);
+        Test.resolveOnTimeout(200).then(PREF_LISTENER.forgetAboutIt);
+        Test.resolveOnTimeout(4200)
+        .then(() => resolve(PREF_LISTENER.size()));
+      })
+    }
+  ).expectAsync(1),
+   
   new Test(
     "writeUserChromeCSS",
     () => {
       return new Promise((resolve, reject) => {
-        Test.createTimeoutLong()
+        Test.resolveOnTimeout(4000)
         .then(() => {
           return _ucUtils.writeFile("../userChrome.css","#nav-bar{ background: #f00 !important; }")
         })
@@ -414,7 +463,7 @@ Above line is also left empty
     }
   ).expectAsync(40) // 40 bytes written
   // Set allowUnsafeWrites pref back to false
-  .then(() => _ucUtils.prefs.set("userChromeJS.allowUnsafeWrites",false))
+  .then(() => _ucUtils.prefs.set(PREF_ALLLOW_UNSAFE,false))
   .then(() => {
     // Check that writing userChrome.css now fails again
     new Test(
@@ -432,6 +481,6 @@ Above line is also left empty
     Test.logResults();
     console.error("Test run failed to settle before timeout!");
   })
-  
+  .finally(() => PREF_LISTENER.reset())
   
 })();

@@ -111,14 +111,9 @@ class Test{
     }
     return {}
   }
-  static createTimeout(){
+  static resolveOnTimeout(millis){
     return new Promise(res => {
-      setTimeout(res,2000)
-    })
-  }
-  static createTimeoutLong(){
-    return new Promise(res => {
-      setTimeout(res,4000)
+      setTimeout(res,millis)
     })
   }
   static rejectOnTimeout(millis){
