@@ -19,7 +19,6 @@ Above line is also left empty
 (function(){
   
   const BRAND_NAME = "Firefox Nightly";
-  const SHARED_GLOBAL_TEST_X = 42;
   const PREF_ALLLOW_UNSAFE = "userChromeJS.allowUnsafeWrites";
   
   const { Test } = ChromeUtils.importESModule("chrome://userscripts/content/000_test_runner.sys.mjs");
@@ -46,9 +45,6 @@ Above line is also left empty
       clients.clear();
     }
   })();
-  
-  // Write some stuff to sharedGlobal
-  _ucUtils.sharedGlobal.test_utils = { x: SHARED_GLOBAL_TEST_X };
 
   // Needs to be alphabetical
   // This should only include files that are actually runnable tests
@@ -58,15 +54,18 @@ Above line is also left empty
   "aaa_test_script.uc.js",
   "test_module_script.sys.mjs",
   "test_module_script.uc.js",
-  "utils_tests.uc.js"
+  "utils_tests.uc.js",
+  "write_to_shared.uc.js"
   ];
   console.info("%crunning tests...","color: rgb(120,160,240)");
+  
   const PROMISES = [
   // Can we read data from sharedGlobal
+  // The value should have been set by write_to_shared.uc.js which should have run before this one.
   new Test(
     "sharedGlobal",
     () => { return _ucUtils.sharedGlobal.test_utils.x }
-  ).expect(SHARED_GLOBAL_TEST_X),
+  ).expect(42),
 
   // Does _ucUtils give us correct brandName
   new Test(
@@ -236,13 +235,15 @@ Above line is also left empty
                     .join(",")
       return scripts.length + ";" + names
     }
-  ).expect(TEST_FILES.length+";,test_module_script,test_module_script_ESM,test_runner,test_utils"),
+  ).expect(TEST_FILES.length+";,test_module_script,test_module_script_ESM,test_runner,test_utils,write-42"),
 
   // Tests load order.
   // The current script (this one) should be false.
   // background-modules should be true
   // scripts that have not been run yet should be false.
-  // NOTE: this script has @loadOrder 5 thus none of the non-backgroundmodules should have been run yet
+  // NOTE: this script has @loadOrder 5 thus none of the non-backgroundmodules  
+  // should have been run yet - except write_to_shared.uc.js which should run
+  // before this because we check if we can read the value it sets from sharedGlobal
   // This test assumes that none of the test scripts have been manually disabled
   new Test(
     "getScriptLoadOrder",
@@ -252,7 +253,7 @@ Above line is also left empty
               .map(a => a.isRunning)
               .join(",");
     }
-  ).expect("false,true,true,true,false"),
+  ).expect("false,true,true,true,false,true"),
   
   // Test invalid getScriptData() filter 1
   new Test(
@@ -475,12 +476,8 @@ Above line is also left empty
   })
   
   ];
-  Promise.race([Test.rejectOnTimeout(8000),Promise.allSettled(PROMISES)])
-  .then(Test.logResults)
-  .catch(()=>{
-    Test.logResults();
-    console.error("Test run failed to settle before timeout!");
-  })
-  .finally(() => PREF_LISTENER.reset())
+  
+  Test.waitForTestSet(PROMISES)
+  .finally(() => PREF_LISTENER.reset());
   
 })();

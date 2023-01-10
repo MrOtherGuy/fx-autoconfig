@@ -10,7 +10,6 @@ class Result{
     this.expected = test.expected;
     this.value = test.value;
     this.name = test.name;
-    this.disabled = false;
   }
   static From(test){
     if(typeof test.expected === "function"){
@@ -47,12 +46,43 @@ class Success extends Result{
   }
 }
 
+class TestWaitable{
+  #result;
+  constructor(aTest){
+    this.name = aTest.name;
+    this.state = aTest.disabled ? Test.SKIPPED : Test.WAITING;
+  }
+  get result(){
+    return this.#result
+  }
+  hasResult(){
+    return this.state != Test.WAITING
+  }
+  setResult(res){
+    this.#result = res;
+    if(this.state != Test.SKIPPED){
+      this.state = res instanceof Success ? Test.SUCCESS : Test.FAILURE;
+    }
+  }
+  log(){
+    if(this.hasResult()){
+      this.result.log()
+    }else{
+      console.warn(`${this.name} failed to settle before test timeout!`)
+    }
+  }
+}
+
 const RESULTS = [];
 
 class Test{
+  #waitable;
   constructor(name,fun){
     this.name = name;
     this.fun = fun;
+  }
+  get waitable(){
+    return this.#waitable;
   }
   exec(){
     return this.fun();
@@ -63,53 +93,70 @@ class Test{
   }
   expectAsync(expect){
     this.expected = expect;
+    this.#waitable = new TestWaitable(this);
+    RESULTS.push(this.#waitable);
     return Test.runnerAsync(this)
   }
   expect(expect){
     this.expected = expect;
+    this.#waitable = new TestWaitable(this);
+    RESULTS.push(this.#waitable);
     return Test.runner(this)
   }
   async expectError(){
     this.expected = "<Error>";
+    this.#waitable = new TestWaitable(this);
+    RESULTS.push(this.#waitable);
+    if(this.disabled){
+      this.#waitable.setResult(new Result(this));
+      return this
+    }
     try{
       await this.exec();
       this.value = "Success";
-      RESULTS.push( new Failure(this) )
+      this.#waitable.setResult(new Failure(this));
     }catch(ex){
       this.value = ex;
-      RESULTS.push( new Success(this) )
+      this.#waitable.setResult(new Success(this));
     }
-    return {}
+    return this
   }
+  static FAILURE = Symbol("failure");
+  static SKIPPED = Symbol("skipped");
+  static SUCCESS = Symbol("success");
+  static WAITING = Symbol("waiting");
+
   static runner(test){
     if(test.disabled){
-      RESULTS.push( new Result(test) )
+      test.#waitable.setResult(new Result(test));
+      return test
     }
     try{
       test.value = test.exec();
-      RESULTS.push( Result.From(test) )
+      test.#waitable.setResult( Result.From(test) )
     }catch(e){
       let fail = new Failure(test);
       fail.value = e;
-      RESULTS.push(fail);
+      test.#waitable.setResult(fail);
       console.error(e);
     }
-    return {}
+    return test
   }
   static async runnerAsync(test){
     if(test.disabled){
-      RESULTS.push( new Result(test) )
+      test.#waitable.setResult(new Result(test));
+      return test
     }
     try{
       test.value = await test.exec();
-      RESULTS.push( Result.From(test) )
+      test.#waitable.setResult( Result.From(test) )
     }catch(e){
       let fail = new Failure(test);
       fail.value = e;
-      RESULTS.push(fail);
+      test.#waitable.setResult(fail);
       fail.log();
     }
-    return {}
+    return test
   }
   static resolveOnTimeout(millis){
     return new Promise(res => {
@@ -121,10 +168,36 @@ class Test{
       setTimeout(reject,millis)
     })
   }
+  
+  static #state = {
+    isRunning: false
+  }
+  
+  static async waitForTestSet(aTestSet){
+    const TIMEOUT = 8000;
+    if(this.#state.isRunning){
+      throw "a test set is already runnning"
+    }
+    this.#state.isRunning = true;
+    try{
+      let resolution = await Promise.race([Test.rejectOnTimeout(TIMEOUT),Promise.allSettled(aTestSet)]);
+    }catch(ex){ }
+    Test.logResults();
+    this.#state.isRunning = false;
+  }
+  
   static logResults(){
+    const passed = RESULTS.reduce((a,b) => a + (b.state === Test.SUCCESS ? 1 : 0),0);
+    const failed = RESULTS.reduce((a,b) => a + (b.state === Test.FAILURE ? 1 : 0),0);
+    const timed_out = RESULTS.reduce((a,b) => a + (b.hasResult() ? 0 : 1),0);
+    const skipped = RESULTS.length - (passed + failed + timed_out);
+    const total = RESULTS.length;
     while(RESULTS.length > 0){
       RESULTS.shift().log()
     }
+    console.info(
+      `%cPassed:  ${passed}/${total}\nFailed:  ${failed}/${total}\nTimeout: ${timed_out}/${total}\nSkipped: ${skipped}/${total}`,
+      "color: rgb(120,160,240)");
   }
 }
 
