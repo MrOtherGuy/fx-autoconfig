@@ -317,20 +317,17 @@ const utils = {
   
   createWidget(desc){
     if(!desc || !desc.id ){
-      console.error("custom widget description is missing 'id' property");
-      return null
+      throw new Error("custom widget description is missing 'id' property");
     }
-    if(!(['toolbaritem','toolbarbutton']).includes(desc.type)){
-      console.error("custom widget has unsupported type: "+desc.type);
-      return null
+    if(!(desc.type === "toolbarbutton" || desc.type === "toolbaritem")){
+      throw new Error(`custom widget has unsupported type: '${desc.type}'`);
     }
     const CUI = Services.wm.getMostRecentBrowserWindow().CustomizableUI;
-    let newWidget = CUI.getWidget(desc.id);
-
-    if(newWidget && newWidget.hasOwnProperty("source")){
+    
+    if(CUI.getWidget(desc.id)?.hasOwnProperty("source")){
       // very likely means that the widget with this id already exists
       // There isn't a very reliable way to 'really' check if it exists or not
-      return newWidget
+      throw new Error(`Widget with ID: '${desc.id}' already exists`);
     }
     // This is pretty ugly but makes onBuild much cleaner.
     let itemStyle = "";

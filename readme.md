@@ -273,7 +273,7 @@ _ucUtils.createElement(document,"menuitem",{ id:"someid", class:"aClass", label:
 
 Attaches a new element with tagname to the given document and adds it attributes from attributes object. isHTML is a boolean indicating whether the element is XUL element or HTML element - defaults to false.
 
-### \_ucUtils.createWidget(details) -> `<Widget wrapper object>` (or null on failure)
+### \_ucUtils.createWidget(details) -> `<Widget wrapper object>`
 
 ```js
 _ucUtils.createWidget({
@@ -305,6 +305,11 @@ The **allEvents** property defines if the callback should be called for all clic
 
 The **image** is loaded from `resources` folder so save your icon files there.
 
+This method will throw if:
+
+* `id` is not provided
+* `type` is anything except `"toolbaritem"` or `"toolbarbutton"`
+* A widget with same id already exists. For example if a script which calls this method is executed in multiple Firefox windows then the first one should succeed, but successive calls should throw an Error.
 
 ### \_ucUtils.registerHotkey(details,function) -> Boolean
 
