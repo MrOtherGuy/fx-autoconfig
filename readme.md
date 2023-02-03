@@ -563,7 +563,7 @@ Scripts folder is registered to: `chrome://userScripts/content/`
 
 The loader module folder is registered to `chrome://userchromejs/content/`
 
-### \_ucUtils.getFSEntry(fileName) -> fileHandle || enumerator for entries in a folder
+### \_ucUtils.getFSEntry(fileName) -> nsIFile || enumerator for entries in a folder
 
 Get file handle for resources/some.txt:
 
@@ -581,7 +581,14 @@ while(contents.hasMoreElements()){
 }
 ```
 
-### \_ucUtils.readFile(\<fileHandle or string\>,metaOnly) -> String
+By default `getFSEntry()` returns an enumerator over files when the argument matches a folder. If you want to return an nsIFile object describing the folder itself then supply optional argument disabling automatic enumeration.
+
+```js
+let directory = _ucUtils.getFSEntry("path", false);
+console.log(directory.leafName)
+```
+
+### \_ucUtils.readFile(\<nsIFile or string\>,metaOnly) -> String
 
 ```js
 _ucUtils.readFile(aFile,false)
@@ -655,6 +662,23 @@ _ucUtils.createFileURI("path\some.png")
 ```
 
 Return a valid file uri describing `<profileDir>\chrome\resources\path\some.png`
+
+### \_ucUtils.showFileOrDirectory(nsIFile) -> Boolean
+
+```js
+let file = _ucUtils.getFSEntry("my_test_file.txt"); // a nsIFile object
+_ucUtils.showFileOrDirectory(file);
+```
+
+Tries to open a given file entry path in OS file manager. Returns true or false indicating success. Whether this works or not probably depends on your OS. Only tested on Windows 10.
+
+### \_ucUtils.openScriptDir() -> Boolean
+
+```js
+_ucUtils.openScriptDir();
+```
+
+Tries to open your script directory in OS file manager. Returns true or false indicating success. Whether this works or not probably depends on your OS. Only tested on Windows 10.
 
 ### \_ucUtils.chromeDir
 
