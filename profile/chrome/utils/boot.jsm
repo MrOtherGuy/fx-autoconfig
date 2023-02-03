@@ -746,12 +746,15 @@ const utils = {
     if(!aEntry.exists()){
       return false
     }
-    if(aEntry.isDirectory()){
-      aEntry.launch();
-    }else if(aEntry.isFile()){
-      aEntry.reveal()
-    }else{
-      throw new Error("aEntry is not directory or file")
+    try{
+      if(aEntry.isDirectory()){
+        aEntry.launch();
+      }else if(aEntry.isFile()){
+        aEntry.reveal()
+      }
+    }catch(ex){
+      console.error("Could not open file manager for: " + aEntry.leafName);
+      return false
     }
     return true
   },
