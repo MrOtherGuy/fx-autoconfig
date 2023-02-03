@@ -191,7 +191,7 @@ class ScriptInfo{
     this.isEnabled = enabled
   }
   asFile(){
-    return getDirEntry(this.filename, true);
+    return getDirEntry(this.filename, false, true);
   }
   static fromScript(aScript, isEnabled){
     let info = new ScriptInfo(isEnabled);
@@ -207,7 +207,7 @@ class ScriptInfo{
   }
 }
 
-function getDirEntry(filename,isLoader = false){
+function getDirEntry(filename, enumerateDirectory, isLoader = false){
   if(typeof filename !== "string"){
     return null
   }
@@ -223,7 +223,9 @@ function getDirEntry(filename,isLoader = false){
     return null
   }
   if(entry.isDirectory()){
-    return entry.directoryEntries.QueryInterface(Ci.nsISimpleEnumerator);
+    return enumerateDirectory
+            ? entry.directoryEntries.QueryInterface(Ci.nsISimpleEnumerator)
+            : entry
   }else if(entry.isFile()){
     return entry
   }else{
@@ -261,7 +263,7 @@ function updateStyleSheet(name,type) {
       return false
     }
   }
-  let entry = getDirEntry(name);
+  let entry = getDirEntry(name, false);
   if(!(entry && entry.isFile())){
     return false
   }
@@ -369,10 +371,13 @@ const utils = {
   
   readFile: function (aFile, metaOnly = false) {
     if(typeof aFile === "string"){
-      aFile = getDirEntry(aFile);
+      aFile = getDirEntry(aFile, false);
     }
     if(!aFile){
       return null
+    }
+    if(!aFile.isFile()){
+      throw new Error("aFile is not a readable file")
     }
     let stream = Cc['@mozilla.org/network/file-input-stream;1'].createInstance(Ci.nsIFileInputStream);
     let cvstream = Cc['@mozilla.org/intl/converter-input-stream;1'].createInstance(Ci.nsIConverterInputStream);
@@ -472,7 +477,7 @@ const utils = {
     }
   },
   
-  getFSEntry: (fileName) => ( getDirEntry(fileName) ),
+  getFSEntry: (fileName, autoEnumerate = true) => getDirEntry(fileName, !!autoEnumerate),
   
   getScriptData: (aFilter) => {
     const filterType = typeof aFilter;
@@ -732,7 +737,26 @@ const utils = {
     return false
   },
   
-  parseStringAsScriptInfo: (aName, aString) => ScriptInfo.fromString(aName, aString)
+  parseStringAsScriptInfo: (aName, aString) => ScriptInfo.fromString(aName, aString),
+  
+  showFileOrDirectory: function (aEntry){
+    if(!(aEntry instanceof Ci.nsIFile)){
+      throw new Error("aEntry must be a nsIFile object")
+    }
+    if(!aEntry.exists()){
+      return false
+    }
+    if(aEntry.isDirectory()){
+      aEntry.launch();
+    }else if(aEntry.isFile()){
+      aEntry.reveal()
+    }else{
+      throw new Error("aEntry is not directory or file")
+    }
+    return true
+  },
+  
+  openScriptDir: () => utils.showFileOrDirectory(getDirEntry("", false, true))
 }
 
 Object.freeze(utils);
@@ -826,7 +850,7 @@ class UserChrome_js{
     this.GBROWSERHACK_ENABLED = gBrowserHackRequired|gBrowserHackEnabled;
     
     // load script data
-    let files = getDirEntry('',true);
+    let files = getDirEntry('', true, true);
     while(files.hasMoreElements()){
       let file = files.getNext().QueryInterface(Ci.nsIFile);
       if (/(.+\.uc\.js|.+\.sys\.mjs)$/i.test(file.leafName)) {
@@ -910,8 +934,9 @@ class UserChrome_js{
       <menu id="userScriptsMenu" label="userScripts">
         <menupopup id="menuUserScriptsPopup" onpopupshown="_ucUtils.updateMenuStatus(this)">
           <menuseparator></menuseparator>
-          <menuitem id="userScriptsRestart" label="Restart" oncommand="_ucUtils.restart(false)" tooltiptext="Toggling scripts requires restart"></menuitem>
-          <menuitem id="userScriptsClearCache" label="Restart and clear startup cache" oncommand="_ucUtils.restart(true)" tooltiptext="Toggling scripts requires restart"></menuitem>
+          <menuitem id="userScriptsMenu-OpenFolder" label="Open folder" oncommand="_ucUtils.openScriptDir()"></menuitem>
+          <menuitem id="userScriptsMenu-Restart" label="Restart" oncommand="_ucUtils.restart(false)" tooltiptext="Toggling scripts requires restart"></menuitem>
+          <menuitem id="userScriptsMenu-ClearCache" label="Restart and clear startup cache" oncommand="_ucUtils.restart(true)" tooltiptext="Toggling scripts requires restart"></menuitem>
         </menupopup>
       </menu>
     `);
@@ -930,11 +955,12 @@ class UserChrome_js{
     }
     menuFragment.getElementById("menuUserScriptsPopup").prepend(itemsFragment);
     menu.parentNode.insertBefore(menuFragment,menu);
-    document.l10n.formatValues(["restart-button-label","clear-startup-cache-label"])
+    document.l10n.formatValues(["restart-button-label","clear-startup-cache-label","show-dir-label"])
     .then(values => {
       let baseTitle = `${values[0]} ${utils.brandName}`;
-      document.getElementById("userScriptsRestart").setAttribute("label", baseTitle);
-      document.getElementById("userScriptsClearCache").setAttribute("label", values[1].replace("…","") + " & " + baseTitle);
+      document.getElementById("userScriptsMenu-Restart").setAttribute("label", baseTitle);
+      document.getElementById("userScriptsMenu-ClearCache").setAttribute("label", values[1].replace("…","") + " & " + baseTitle);
+      document.getElementById("userScriptsMenu-OpenFolder").setAttribute("label",values[2])
     })
   }
   
