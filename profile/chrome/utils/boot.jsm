@@ -89,7 +89,7 @@ const BASE_FILEURI = Services.io.getProtocolHandler('file')
                     .getURLSpecFromDir(Services.dirsvc.get('UChrm',Ci.nsIFile));
 
 class ScriptData {
-  constructor(leafName, headerText){
+  constructor(leafName, headerText, noExec){
     const hasLongDescription = (/^\/\/\ @long-description/im).test(headerText);
     this.filename = leafName;
     this.name = headerText.match(/\/\/ @name\s+(.+)\s*$/im)?.[1];
@@ -112,7 +112,8 @@ class ScriptData {
     this.inbackground = this.isESM || /\/\/ @backgroundmodule\b/.test(headerText);
     this.ignoreCache = /\/\/ @ignorecache\b/.test(headerText);
     this.isRunning = false;
-    
+    this.manifest = headerText.match(/\/\/ @manifest\s+(.+)\s*$/im)?.[1];
+    this.noExec = noExec;
     // Construct regular expression to use to match target document
     let match, rex = {
       include: [],
@@ -145,7 +146,7 @@ class ScriptData {
   }
   
   tryLoadIntoWindow(win) {
-    if (this.inbackground || !this.regex.test(win.location.href)) {
+    if (this.inbackground || this.noExec || !this.regex.test(win.location.href)) {
       return
     }
     try {
@@ -176,15 +177,31 @@ class ScriptData {
   getInfo(){
     return ScriptInfo.fromScript(this,this.isEnabled);
   }
-  
+  registerManifest(){
+    if(this.isRunning){
+      return
+    }
+    let cmanifest = getDirEntry(`${this.manifest}.manifest`, false, true);
+    if(cmanifest){
+      Components.manager
+      .QueryInterface(Ci.nsIComponentRegistrar).autoRegister(cmanifest);
+    }else{
+      console.warn(`Script '${this.filename}' tried to register a manifest but requested file '${this.manifest}' doesn't exist`);
+    }
+  }
   static fromFile(aFile){
-    const headerText = utils.readFile(aFile,true)
-    .match(/^\/\/ ==UserScript==\s*\n(?:.*\n)*?\/\/ ==\/UserScript==\s*\n/m);
-    return new ScriptData(aFile.leafName, headerText ? headerText[0] : '');
+    if(aFile.fileSize < 24){
+      // Smaller files can't possibly have a valid header
+      return new ScriptData(aFile.leafName,"",aFile.fileSize === 0)
+    }
+    const content = utils.readFile(aFile,true,false);
+    const headerText = content
+    .match(/^\/\/ ==UserScript==\s*[\n\r]+(?:.*[\n\r]+)*?\/\/ ==\/UserScript==\s*/m)?.[0] || "";
+    // If there are less than 2 bytes after the header then we mark the script as non-executable. This means that if the file only has a header then we don't try to inject it to any windows, since it wouldn't do anything.
+    return new ScriptData(aFile.leafName, headerText, headerText.length > aFile.fileSize - 2);
   }
   
 }
-
 // _ucUtils.getScriptData() returns these types of objects
 class ScriptInfo{
   constructor(enabled){
@@ -201,8 +218,8 @@ class ScriptInfo{
   }
   static fromString(aName, aString) {
     const headerText = aString
-    .match(/^\/\/ ==UserScript==\s*\n(?:.*\n)*?\/\/ ==\/UserScript==\s*\n/m);
-    const scriptData = new ScriptData(aName, headerText ? headerText[0] : '');
+    .match(/^\/\/ ==UserScript==\s*[\n\r]+(?:.*[\n\r]+)*?\/\/ ==\/UserScript==\s*/m)?.[0] || "";
+    const scriptData = new ScriptData(aName, headerText, headerText.length > aString.length - 2);
     return ScriptInfo.fromScript(scriptData, false)
   }
 }
@@ -369,7 +386,7 @@ const utils = {
     });
   },
   
-  readFile: function (aFile, metaOnly = false) {
+  readFile: function (aFile, metaOnly = false, replaceNewlines = true) {
     if(typeof aFile === "string"){
       aFile = getDirEntry(aFile, false);
     }
@@ -388,8 +405,8 @@ const utils = {
       console.error(e);
       return null
     }
-    let content = '',
-    data = {};
+    let content = '';
+    let data = {};
     while (cvstream.readString(4096, data)) {
       content += data.value;
       if (metaOnly && content.indexOf('// ==/UserScript==') > 0) {
@@ -398,7 +415,10 @@ const utils = {
     }
     cvstream.close();
     stream.close();
-    return content.replace(/\r\n?/g, '\n');
+    
+    return replaceNewlines
+          ? content.replace(/\r\n?/g, '\n')
+          : content
   },
   
   readFileAsync: function(path){
@@ -846,7 +866,6 @@ class UserChrome_js{
     if(this.initialized){
       return
     }
-    
     // gBrowserHack setup
     const gBrowserHackRequired = yPref.get("userChromeJS.gBrowser_hack.required") ? 2 : 0;
     const gBrowserHackEnabled = yPref.get(PREF_GBROWSERHACKENABLED) ? 1 : 0;
@@ -859,7 +878,15 @@ class UserChrome_js{
       if (/(.+\.uc\.js|.+\.sys\.mjs)$/i.test(file.leafName)) {
         let script = ScriptData.fromFile(file);
         this.scripts.push(script);
-        if(script.inbackground && script.isEnabled){
+        const scriptIsEnabled = script.isEnabled;
+        if(scriptIsEnabled && script.manifest){
+          try{
+            script.registerManifest();
+          }catch(ex){
+            console.error(new Error(`@ ${script.filename}`,{cause:ex}));
+          }
+        }
+        if(scriptIsEnabled && script.inbackground){
           try{
             const fileName = `chrome://userscripts/content/${script.filename}`;
             if(script.isESM){
