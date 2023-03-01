@@ -5,6 +5,7 @@ const Services =
   globalThis.Services ||
   ChromeUtils.import("resource://gre/modules/Services.jsm").Services;
 const {AppConstants} = ChromeUtils.import('resource://gre/modules/AppConstants.jsm');
+const FS = ChromeUtils.import("chrome://userchromejs/content/fs.jsm").FileSystem;
 
 const yPref = {
   get: function (prefPath) {
@@ -45,22 +46,6 @@ const yPref = {
   removeListener:(a)=>( Services.prefs.removeObserver(a.pref,a.observer) )
 };
 
-function resolveChromeURL(str){
-  const registry = Cc["@mozilla.org/chrome/chrome-registry;1"].getService(Ci.nsIChromeRegistry);
-  try{
-    return registry.convertChromeURL(Services.io.newURI(str.replace(/\\/g,"/"))).spec
-  }catch(e){
-    console.error(e);
-    return ""
-  }
-}
-
-// relative to "chrome" folder
-function resolveChromePath(str){
-  let parts = resolveChromeURL(str).split("/");
-  return parts.slice(parts.indexOf("chrome") + 1,parts.length - 1).join("/");
-}
-
 const SHARED_GLOBAL = {};
 Object.defineProperty(SHARED_GLOBAL,"widgetCallbacks",{value:new Map()});
 
@@ -82,11 +67,6 @@ const BROWSERCHROME = (() => {
 const PREF_ENABLED = 'userChromeJS.enabled';
 const PREF_SCRIPTSDISABLED = 'userChromeJS.scriptsDisabled';
 const PREF_GBROWSERHACKENABLED = 'userChromeJS.gBrowser_hack.enabled';
-const SCRIPT_DIR = resolveChromePath('chrome://userscripts/content/');
-const RESOURCE_DIR = resolveChromePath('chrome://userchrome/content/');
-const BASE_FILEURI = Services.io.getProtocolHandler('file')
-                    .QueryInterface(Ci.nsIFileProtocolHandler)
-                    .getURLSpecFromDir(Services.dirsvc.get('UChrm',Ci.nsIFile));
 
 class ScriptData {
   constructor(leafName, headerText, noExec){
@@ -181,26 +161,28 @@ class ScriptData {
     if(this.isRunning){
       return
     }
-    let cmanifest = getDirEntry(`${this.manifest}.manifest`, false, true);
-    if(cmanifest){
+    let cmanifest = FS.getEntry(`${this.manifest}.manifest`, {baseDirectory: FS.SCRIPT_DIR});
+    if(cmanifest.isFile()){
       Components.manager
-      .QueryInterface(Ci.nsIComponentRegistrar).autoRegister(cmanifest);
+      .QueryInterface(Ci.nsIComponentRegistrar).autoRegister(cmanifest.entry());
     }else{
       console.warn(`Script '${this.filename}' tried to register a manifest but requested file '${this.manifest}' doesn't exist`);
     }
+  }
+  static extractHeaderText(aFSResult){
+    return aFSResult.content()
+      .match(/^\/\/ ==UserScript==\s*[\n\r]+(?:.*[\n\r]+)*?\/\/ ==\/UserScript==\s*/m)?.[0] || ""
   }
   static fromFile(aFile){
     if(aFile.fileSize < 24){
       // Smaller files can't possibly have a valid header
       return new ScriptData(aFile.leafName,"",aFile.fileSize === 0)
     }
-    const content = utils.readFile(aFile,true,false);
-    const headerText = content
-    .match(/^\/\/ ==UserScript==\s*[\n\r]+(?:.*[\n\r]+)*?\/\/ ==\/UserScript==\s*/m)?.[0] || "";
+    const result = FS.readFileSync(aFile,{ metaOnly: true });
+    const headerText = this.extractHeaderText(result);
     // If there are less than 2 bytes after the header then we mark the script as non-executable. This means that if the file only has a header then we don't try to inject it to any windows, since it wouldn't do anything.
     return new ScriptData(aFile.leafName, headerText, headerText.length > aFile.fileSize - 2);
   }
-  
 }
 // _ucUtils.getScriptData() returns these types of objects
 class ScriptInfo{
@@ -208,7 +190,7 @@ class ScriptInfo{
     this.isEnabled = enabled
   }
   asFile(){
-    return getDirEntry(this.filename, false, true);
+    return FS.getEntry(this.filename,{baseDirectory: FS.SCRIPT_DIR});
   }
   static fromScript(aScript, isEnabled){
     let info = new ScriptInfo(isEnabled);
@@ -216,46 +198,11 @@ class ScriptInfo{
     info.regex = new RegExp(aScript.regex.source, aScript.regex.flags);
     return info
   }
-  static fromString(aName, aString) {
-    const headerText = aString
-    .match(/^\/\/ ==UserScript==\s*[\n\r]+(?:.*[\n\r]+)*?\/\/ ==\/UserScript==\s*/m)?.[0] || "";
+  static fromString(aName, aStringAsFSResult) {
+    const headerText = ScriptData.extractHeaderText(aStringAsFSResult);
     const scriptData = new ScriptData(aName, headerText, headerText.length > aString.length - 2);
     return ScriptInfo.fromScript(scriptData, false)
   }
-}
-
-function getDirEntry(filename, enumerateDirectory, isLoader = false){
-  if(typeof filename !== "string"){
-    return null
-  }
-  filename = filename.replace("\\","/");
-  let pathParts = ((filename.startsWith("..") ? "" : (isLoader ? SCRIPT_DIR : RESOURCE_DIR)) + "/" + filename)
-                  .split("/").filter( (a) => (!!a && a != "..") );
-  let entry = Services.dirsvc.get('UChrm',Ci.nsIFile);
-  
-  for(let part of pathParts){
-    entry.append(part)
-  }
-  if(!entry.exists()){
-    return null
-  }
-  if(entry.isDirectory()){
-    return enumerateDirectory
-            ? entry.directoryEntries.QueryInterface(Ci.nsISimpleEnumerator)
-            : entry
-  }else if(entry.isFile()){
-    return entry
-  }else{
-    return null
-  }
-}
-
-async function getProfileDir(){
-  if(APP_VARIANT.FIREFOX){
-    return PathUtils.profileDir
-  }
-  // APP_VARIANT = THUNDERBIRD
-  return await PathUtils.getProfileDir()
 }
 
 function updateStyleSheet(name,type) {
@@ -280,8 +227,8 @@ function updateStyleSheet(name,type) {
       return false
     }
   }
-  let entry = getDirEntry(name, false);
-  if(!(entry && entry.isFile())){
+  let fsResult = FS.getEntry(name);
+  if(!fsResult.isFile()){
     return false
   }
   let recentWindow = Services.wm.getMostRecentBrowserWindow();
@@ -310,11 +257,11 @@ function updateStyleSheet(name,type) {
   // each instace but that's OK since sheets.find below will
   // only find the first instance and reload that which is
   // "probably" fine.
-  let entryFilePath = `file:///${entry.path.replaceAll("\\","/")}`;
+  let entryFilePath = `file:///${fsResult.entry().path.replaceAll("\\","/")}`;
   
   let target = sheets.find(sheet => sheet.href === entryFilePath);
   if(target){
-    recentWindow.InspectorUtils.parseStyleSheet(target,utils.readFile(entry));
+    recentWindow.InspectorUtils.parseStyleSheet(target,fsResult.readSync());
     return true
   }
   return false
@@ -333,7 +280,7 @@ const utils = {
     }
     return el
   },
-  
+  fs: FS,
   createWidget(desc){
     if(!desc || !desc.id ){
       throw new Error("custom widget description is missing 'id' property");
@@ -385,120 +332,6 @@ const utils = {
       }
     });
   },
-  
-  readFile: function (aFile, metaOnly = false, replaceNewlines = true) {
-    if(typeof aFile === "string"){
-      aFile = getDirEntry(aFile, false);
-    }
-    if(!aFile){
-      return null
-    }
-    if(!aFile.isFile()){
-      throw new Error("aFile is not a readable file")
-    }
-    let stream = Cc['@mozilla.org/network/file-input-stream;1'].createInstance(Ci.nsIFileInputStream);
-    let cvstream = Cc['@mozilla.org/intl/converter-input-stream;1'].createInstance(Ci.nsIConverterInputStream);
-    try{
-      stream.init(aFile, 0x01, 0, 0);
-      cvstream.init(stream, 'UTF-8', 1024, Ci.nsIConverterInputStream.DEFAULT_REPLACEMENT_CHARACTER);
-    }catch(e){
-      console.error(e);
-      return null
-    }
-    let content = '';
-    let data = {};
-    while (cvstream.readString(4096, data)) {
-      content += data.value;
-      if (metaOnly && content.indexOf('// ==/UserScript==') > 0) {
-        break;
-      }
-    }
-    cvstream.close();
-    stream.close();
-    
-    return replaceNewlines
-          ? content.replace(/\r\n?/g, '\n')
-          : content
-  },
-  
-  readFileAsync: function(path){
-    if(typeof path !== "string"){
-      return Promise.reject("readFileAsync: path is not a string")
-    }
-    let base = ["chrome",RESOURCE_DIR];
-    let parts = path.split(/[\\\/]/);
-    while(parts[0] === ".."){
-      base.pop();
-      parts.shift();
-    }
-    
-    return new Promise(resolve => {
-      getProfileDir()
-      .then((path) => PathUtils.join(path, ...base.concat(parts)))
-      .then(IOUtils.readUTF8)
-      .then(resolve)
-    })
-    
-  },
-  
-  readJSON: async function(path){
-    try{
-      let content = await utils.readFileAsync(path);
-      return JSON.parse(content);
-    }catch(ex){
-      console.error(ex)
-    }
-    return null
-  },
-  
-  writeFile: async function(path, content, options = {}){
-    if(!path || typeof path !== "string"){
-      throw "writeFile: path is invalid"
-    }
-    if(typeof content !== "string"){
-      throw "writeFile: content to write must be a string"
-    }
-
-    let base = ["chrome",RESOURCE_DIR];
-    let parts = path.split(/[\\\/]/);
-    
-    // Normally, this API can only write into resources directory
-    // Writing outside of resources can be enabled using following pref
-    const disallowUnsafeWrites = !yPref.get("userChromeJS.allowUnsafeWrites");
-
-    while(parts[0] === ".."){
-      if(disallowUnsafeWrites){
-        throw "Writing outside of resources directory is not allowed"
-      }
-      base.pop();
-      parts.shift();
-    }
-    const fileName = PathUtils.join( await getProfileDir(), ...base.concat(parts) );
-    
-    if(!options.tmpPath){
-      options.tmpPath = fileName + ".tmp";
-    }
-    return IOUtils.writeUTF8( fileName, content, options );
-  },
-  
-  createFileURI: (fileName = "") => {
-    fileName = String(fileName);
-    let u = resolveChromeURL(`chrome://userchrome/content/${fileName}`);
-    return fileName ? u : u.substr(0,u.lastIndexOf("/") + 1); 
-  },
-  
-  get chromeDir(){
-    return {
-      get files(){
-        const dir = Services.dirsvc.get('UChrm',Ci.nsIFile);
-        return dir.directoryEntries.QueryInterface(Ci.nsISimpleEnumerator)
-      },
-      uri: BASE_FILEURI
-    }
-  },
-  
-  getFSEntry: (fileName, autoEnumerate = true) => getDirEntry(fileName, !!autoEnumerate),
-  
   getScriptData: (aFilter) => {
     const filterType = typeof aFilter;
     if(aFilter && !(filterType === "string" || filterType === "function")){
@@ -757,7 +590,7 @@ const utils = {
     return false
   },
   
-  parseStringAsScriptInfo: (aName, aString) => ScriptInfo.fromString(aName, aString),
+  parseStringAsScriptInfo: (aName, aString) => ScriptInfo.fromString(aName, FS.StringContent(aString)),
   
   showFileOrDirectory: function (aEntry){
     if(!(aEntry instanceof Ci.nsIFile)){
@@ -779,7 +612,7 @@ const utils = {
     return true
   },
   
-  openScriptDir: () => utils.showFileOrDirectory(getDirEntry("", false, true))
+  openScriptDir: () => utils.showFileOrDirectory(FS.getEntry("",{baseDirectory: FS.SCRIPT_DIR}))
 }
 
 Object.freeze(utils);
@@ -870,15 +703,15 @@ class UserChrome_js{
     const gBrowserHackRequired = yPref.get("userChromeJS.gBrowser_hack.required") ? 2 : 0;
     const gBrowserHackEnabled = yPref.get(PREF_GBROWSERHACKENABLED) ? 1 : 0;
     this.GBROWSERHACK_ENABLED = gBrowserHackRequired|gBrowserHackEnabled;
-    
+    const disabledScripts = (yPref.get(PREF_SCRIPTSDISABLED) || '').split(",");
     // load script data
-    let files = getDirEntry('', true, true);
-    while(files.hasMoreElements()){
-      let file = files.getNext().QueryInterface(Ci.nsIFile);
+      
+    for(let fsResult of FS.getEntry('',{baseDirectory: FS.SCRIPT_DIR})){
+      let file = fsResult.entry();
       if (/(.+\.uc\.js|.+\.sys\.mjs)$/i.test(file.leafName)) {
         let script = ScriptData.fromFile(file);
         this.scripts.push(script);
-        const scriptIsEnabled = script.isEnabled;
+        const scriptIsEnabled = !disabledScripts.includes(script.fileName);
         if(scriptIsEnabled && script.manifest){
           try{
             script.registerManifest();

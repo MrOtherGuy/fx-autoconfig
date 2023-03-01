@@ -142,21 +142,37 @@ Above line is also left empty
   // Synchronously read file content with string argument treated as relative path
   new Test(
     "readFileFromString",
-    () => { return _ucUtils.readFile("test_file.txt") }
+    () => { return _ucUtils.fs.readFileSync("test_file.txt").content() }
   ).expect("This is a test file used in testing"),
 
   // Synchronously read file content with reference to File object
   new Test("readFileFromFile",
     () => {
-      let file = _ucUtils.getFSEntry("test_file.txt");
-      return _ucUtils.readFile(file);
+      let fsResult = _ucUtils.fs.getEntry("test_file.txt");
+      return _ucUtils.fs.readFileSync(fsResult.entry()).content();
+    }
+  ).expect("This is a test file used in testing"),
+
+  // Synchronously read file content from fsResult
+  new Test("readFileFromFSResult",
+    () => {
+      let fsResult = _ucUtils.fs.getEntry("test_file.txt");
+      return fsResult.readSync();
     }
   ).expect("This is a test file used in testing"),
 
   // Async file read with string argument as relative path
   new Test(
     "readFileAsync",
-    () => { return _ucUtils.readFileAsync("test_file.txt") }
+    () => { return _ucUtils.fs.readFile("test_file.txt") }
+  ).expectAsync(fsResult => fsResult.content() === "This is a test file used in testing"),
+
+  // Asynchronously read file content from fsResult
+  new Test("readFileFromFSResultAsync",
+    () => {
+      let fsResult = _ucUtils.fs.getEntry("test_file.txt");
+      return fsResult.read();
+    }
   ).expectAsync("This is a test file used in testing"),
 
   // Async file read as json
@@ -164,7 +180,7 @@ Above line is also left empty
     "readJSON",
     () => {
       return new Promise((resolve, reject) => {
-        _ucUtils.readJSON("test_json.json")
+        _ucUtils.fs.readJSON("test_json.json")
         .then(some => resolve(some.property))
         .catch(reject)
       })
@@ -177,10 +193,10 @@ Above line is also left empty
     () => {
       return new Promise((resolve, reject) => {
         let bytes = null;
-        _ucUtils.writeFile("write_test_basic.txt","test file content")
+        _ucUtils.fs.writeFile("write_test_basic.txt","test file content")
         .then(some => { bytes = some })
-        .then(() => _ucUtils.readFileAsync("write_test_basic.txt"))
-        .then((text) => resolve(text + ": " + bytes) )
+        .then(() => _ucUtils.fs.readFile("write_test_basic.txt"))
+        .then((fsResult) => resolve(fsResult.content() + ": " + bytes) )
         .catch(reject)
       })
     }
@@ -189,12 +205,10 @@ Above line is also left empty
   // List names of files in a directory
   new Test("listFileNames",
     () => {
-      let files = _ucUtils.getFSEntry("../");
       let names = [];
-      while(files.hasMoreElements()){
-        let file = files.getNext().QueryInterface(Ci.nsIFile);
-        if(file.isFile()){
-          names.push(file.leafName);
+      for(let fsResult of _ucUtils.fs.getEntry("../")){
+        if(fsResult.isFile()){
+          names.push(fsResult.entry().leafName);
         }
       }
       return names.join(",");
@@ -207,7 +221,7 @@ Above line is also left empty
   new Test(
     "getChromeDir",
     () => {
-      let items = _ucUtils.chromeDir.files;
+      let items = _ucUtils.fs.chromeDir().files;
       let names = [];
       while(items.hasMoreElements()){
         let file = items.getNext().QueryInterface(Ci.nsIFile);
@@ -222,7 +236,7 @@ Above line is also left empty
   // Get File object from file name
   new Test(
     "getFSEntry",
-    () => { return _ucUtils.getFSEntry("test_file.txt") != null }
+    () => { return _ucUtils.fs.getEntry("test_file.txt").isFile() }
   ).expect(true),
 
   // return list of script names in directory (not file names)
@@ -321,7 +335,7 @@ Above line is also left empty
   new Test(
     "excpectError_writeUserChromeCSS_BeforeStartup",
     () => {
-      return _ucUtils.writeFile("../userChrome.css","#nav-bar{ background: #f00 !important; }")
+      return _ucUtils.fs.writeFile("../userChrome.css","#nav-bar{ background: #f00 !important; }")
     }
   ).expectError(),
   
@@ -348,7 +362,7 @@ Above line is also left empty
         .then( () => {
           // The color expected here is set in one of the tests that follow
           let oldColor = getNavBarStyle().backgroundColor;
-          _ucUtils.writeFile("../userChrome.css","#nav-bar{ background: #ba5 !important; }")
+          _ucUtils.fs.writeFile("../userChrome.css","#nav-bar{ background: #ba5 !important; }")
           .then(() => _ucUtils.updateStyleSheet())
           .then(()=>Test.resolveOnTimeout(2000)) // necessary because the style may not be applied immediately
           .then( () => resolve(oldColor + " : " + getNavBarStyle().backgroundColor) )
@@ -457,7 +471,7 @@ Above line is also left empty
       return new Promise((resolve, reject) => {
         Test.resolveOnTimeout(4000)
         .then(() => {
-          return _ucUtils.writeFile("../userChrome.css","#nav-bar{ background: #f00 !important; }")
+          return _ucUtils.fs.writeFile("../userChrome.css","#nav-bar{ background: #f00 !important; }")
         })
         .then(resolve)
         .catch(reject)
@@ -471,7 +485,7 @@ Above line is also left empty
     new Test(
       "excpectError_writeUserChromeCSS_AfterStartup",
       () => {
-        return _ucUtils.writeFile("../userChrome.css","#nav-bar{ background: #f00 !important; }")
+        return _ucUtils.fs.writeFile("../userChrome.css","#nav-bar{ background: #f00 !important; }")
       }
     ).expectError()
   })
