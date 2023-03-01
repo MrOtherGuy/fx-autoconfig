@@ -705,11 +705,9 @@ class UserChrome_js{
     this.GBROWSERHACK_ENABLED = gBrowserHackRequired|gBrowserHackEnabled;
     const disabledScripts = (yPref.get(PREF_SCRIPTSDISABLED) || '').split(",");
     // load script data
-      
-    for(let fsResult of FS.getEntry('',{baseDirectory: FS.SCRIPT_DIR})){
-      let file = fsResult.entry();
-      if (/(.+\.uc\.js|.+\.sys\.mjs)$/i.test(file.leafName)) {
-        let script = ScriptData.fromFile(file);
+    for(let entry of FS.getEntry('',{baseDirectory: FS.SCRIPT_DIR})){
+      if (/(.+\.uc\.js|.+\.sys\.mjs)$/i.test(entry.leafName)) {
+        let script = ScriptData.fromFile(entry);
         this.scripts.push(script);
         const scriptIsEnabled = !disabledScripts.includes(script.fileName);
         if(scriptIsEnabled && script.manifest){
@@ -738,7 +736,6 @@ class UserChrome_js{
     Services.obs.addObserver(this, 'domwindowopened', false);
     this.initialized = true;
   }
-  
   onDOMContent(document){
     const window = document.defaultView;
     if(!(/^chrome:(?!\/\/global\/content\/(commonDialog|alerts\/alert)\.xhtml)|about:(?!blank)/i).test(window.location.href)){

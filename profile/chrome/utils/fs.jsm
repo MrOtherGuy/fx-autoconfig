@@ -74,19 +74,19 @@ class FileSystem{
       stream.close();
       return FileSystemResult.fromError(new Error(`File stream initialization failed for '${aFile.leafName}`))
     }
-    let content = '';
+    let rv = {content:''};
     let data = {};
     const metaOnly = !!options.metaOnly;
     while (cvstream.readString(4096, data)) {
-      content += data.value;
-      if (metaOnly && content.indexOf('// ==/UserScript==') > 0) {
+      rv.content += data.value;
+      if (metaOnly && rv.content.indexOf('// ==/UserScript==') > 0) {
         break;
       }
     }
     cvstream.close();
     stream.close();
     
-    return FileSystemResult.fromContent({content: content})
+    return FileSystemResult.fromContent(rv)
   }
   static convertResourceRelativeURI(aPath){
     let base = ["chrome",this.RESOURCE_DIR];
@@ -109,7 +109,6 @@ class FileSystem{
       console.error(ex)
       return FileSystemResult.fromError(ex)
     }
-    
   }  
   static async readJSON(path){
     try{
@@ -237,7 +236,7 @@ class FileSystemResult{
       next() {
         return enumerator.hasMoreElements()
         ? {
-            value: FileSystemResult.fromNsIFile(enumerator.getNext().QueryInterface(Ci.nsIFile)),
+            value: enumerator.getNext().QueryInterface(Ci.nsIFile),
             done: false
           }
         : { done: true }

@@ -206,9 +206,9 @@ Above line is also left empty
   new Test("listFileNames",
     () => {
       let names = [];
-      for(let fsResult of _ucUtils.fs.getEntry("../")){
-        if(fsResult.isFile()){
-          names.push(fsResult.entry().leafName);
+      for(let entry of _ucUtils.fs.getEntry("../")){
+        if(entry.isFile()){
+          names.push(entry.leafName);
         }
       }
       return names.join(",");
