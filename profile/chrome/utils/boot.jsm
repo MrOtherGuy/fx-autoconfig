@@ -200,7 +200,7 @@ class ScriptInfo{
   }
   static fromString(aName, aStringAsFSResult) {
     const headerText = ScriptData.extractHeaderText(aStringAsFSResult);
-    const scriptData = new ScriptData(aName, headerText, headerText.length > aString.length - 2);
+    const scriptData = new ScriptData(aName, headerText, headerText.length > aStringAsFSResult.size - 2);
     return ScriptInfo.fromScript(scriptData, false)
   }
 }
@@ -590,7 +590,7 @@ const utils = {
     return false
   },
   
-  parseStringAsScriptInfo: (aName, aString) => ScriptInfo.fromString(aName, FS.StringContent(aString)),
+  parseStringAsScriptInfo: (aName, aString) => ScriptInfo.fromString(aName, FS.StringContent({content: aString})),
   
   showFileOrDirectory: function (aEntry){
     if(!(aEntry instanceof Ci.nsIFile)){
@@ -612,7 +612,7 @@ const utils = {
     return true
   },
   
-  openScriptDir: () => utils.showFileOrDirectory(FS.getEntry("",{baseDirectory: FS.SCRIPT_DIR}))
+  openScriptDir: () => utils.showFileOrDirectory(FS.getEntry("",{baseDirectory: FS.SCRIPT_DIR}).entry())
 }
 
 Object.freeze(utils);

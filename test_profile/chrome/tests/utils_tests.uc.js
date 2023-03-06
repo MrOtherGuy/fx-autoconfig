@@ -221,12 +221,10 @@ Above line is also left empty
   new Test(
     "getChromeDir",
     () => {
-      let items = _ucUtils.fs.chromeDir().files;
       let names = [];
-      while(items.hasMoreElements()){
-        let file = items.getNext().QueryInterface(Ci.nsIFile);
-        if(file.isDirectory()){
-          names.push(file.leafName);
+      for(let entry of _ucUtils.fs.chromeDir()){
+        if(entry.isDirectory()){
+          names.push(entry.leafName);
         }
       }
       return names.join(",");
@@ -238,7 +236,29 @@ Above line is also left empty
     "getFSEntry",
     () => { return _ucUtils.fs.getEntry("test_file.txt").isFile() }
   ).expect(true),
-
+  
+  new Test(
+    "getFileURIFromFile",
+    () => { return _ucUtils.fs.getEntry("test_file.txt").fileURI }
+  ).expect(`${_ucUtils.fs.BASE_FILEURI}resources/test_file.txt`),
+    
+  new Test(
+    "getFileURIFromContent",
+    () => {
+      return new Promise(resolve => {
+        _ucUtils.fs.readFile("test_file.txt")
+        .then(result => resolve(result.fileURI))
+      })
+    }
+  ).expectAsync(`${_ucUtils.fs.BASE_FILEURI}resources/test_file.txt`),
+    
+  new Test(
+    "getFileURIFromContentSync",
+    () => {
+      return _ucUtils.fs.readFileSync("test_file.txt").fileURI
+    }
+  ).expect(`${_ucUtils.fs.BASE_FILEURI}resources/test_file.txt`),
+  
   // return list of script names in directory (not file names)
   // Note: aaa_test_script.uc.js does not have a name so it should be first
   new Test(
@@ -293,6 +313,26 @@ Above line is also left empty
     "getNonExistingScriptInfo",
     () => _ucUtils.getScriptData("non-existing-name")
   ).expect(null),
+  
+  // Test getting ScriptInfo from string
+  new Test(
+    "getScriptInfoFromString",
+    () => {
+      const headertext = `// ==UserScript==
+// @name           fake-text
+// @description    hello world!
+// @loadOrder 5
+// ==/UserScript==
+`;
+      return _ucUtils.parseStringAsScriptInfo("fake-file.txt",headertext);
+    }
+  ).expect( scriptInfo => {
+    return scriptInfo.filename === "fake-file.txt"
+            && scriptInfo.isRunning === false
+            && scriptInfo.noExec === true
+            && scriptInfo.regex.test("chrome://browser/content/browser.xhtml")
+            && scriptInfo.loadOrder === 5
+  }),
   
   // Test getting ScriptInfo from filter function
   new Test(

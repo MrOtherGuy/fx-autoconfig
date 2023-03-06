@@ -6,14 +6,23 @@ const Services =
 
 class FileSystem{
   static PROFILE_DIR = Services.dirsvc.get("ProfD", Ci.nsIFile).path;
-  static BASE_FILEURI = Services.io.getProtocolHandler('file')
-                    .QueryInterface(Ci.nsIFileProtocolHandler)
-                    .getURLSpecFromDir(Services.dirsvc.get('UChrm',Ci.nsIFile));
+  
   static RESULT_CONTENT = Symbol("Content");
   static RESULT_DIRECTORY = Symbol("Directory");
   static RESULT_ERROR = Symbol("Error");
   static RESULT_FILE = Symbol("File");
-                    
+
+  static getFileURIForFile(aEntry, type){
+    let qi = Services.io.getProtocolHandler('file').QueryInterface(Ci.nsIFileProtocolHandler);
+    if(type === this.RESULT_DIRECTORY){
+      return qi.getURLSpecFromDir(aEntry)
+    }
+    if(type === this.RESULT_FILE){
+      return qi.getURLSpecFromActualFile(aEntry)
+    }
+    throw new Error("type argument must be either RESULT_FILE or RESULT_DIRECTORY")
+  }
+
   static resolveChromePath(str){
     let parts = this.resolveChromeURL(str).split("/");
     return parts.slice(parts.indexOf("chrome") + 1,parts.length - 1).join("/");
@@ -32,6 +41,7 @@ class FileSystem{
   static{
     this.SCRIPT_DIR = this.resolveChromePath('chrome://userscripts/content/');
     this.RESOURCE_DIR = this.resolveChromePath('chrome://userchrome/content/');
+    this.BASE_FILEURI = this.getFileURIForFile(Services.dirsvc.get('UChrm',Ci.nsIFile),this.RESULT_DIRECTORY);
   }
   
   static #getEntry(aFilename, baseDirectory){
@@ -74,7 +84,7 @@ class FileSystem{
       stream.close();
       return FileSystemResult.fromError(new Error(`File stream initialization failed for '${aFile.leafName}`))
     }
-    let rv = {content:''};
+    let rv = {content:'',path: this.getFileURIForFile(aFile,this.RESULT_FILE)};
     let data = {};
     const metaOnly = !!options.metaOnly;
     while (cvstream.readString(4096, data)) {
@@ -104,7 +114,7 @@ class FileSystem{
     }
     try{
       let path = this.convertResourceRelativeURI(aPath);
-      return FileSystemResult.fromContent({ content: await IOUtils.readUTF8(path) })
+      return FileSystemResult.fromContent({ content: await IOUtils.readUTF8(path), path: PathUtils.toFileURI(path) })
     }catch(ex){
       console.error(ex)
       return FileSystemResult.fromError(ex)
@@ -156,13 +166,7 @@ class FileSystem{
     return fileName ? u : u.substr(0,u.lastIndexOf("/") + 1); 
   }
   static chromeDir(){
-    return {
-      get files(){
-        const dir = Services.dirsvc.get('UChrm',Ci.nsIFile);
-        return dir.directoryEntries.QueryInterface(Ci.nsISimpleEnumerator)
-      },
-      uri: this.BASE_FILEURI
-    }
+    return FileSystemResult.fromDirectory(Services.dirsvc.get('UChrm',Ci.nsIFile))
   }
   static StringContent(obj){
     return FileSystemResult.fromContent(obj)
@@ -172,9 +176,25 @@ class FileSystem{
 class FileSystemResult{
   #result;
   #type;
+  #fileuri;
   constructor(data,resultType){
     this.#result = data;
     this.#type = resultType;
+  }
+  #getFileURI(){
+    if(this.isContent()){
+      return this.#result.path
+    }
+    return FileSystem.getFileURIForFile(this.#result,this.#type)
+  }
+  get fileURI(){
+    if(this.isError()){
+      return null
+    }
+    if(!this.#fileuri){
+      this.#fileuri = this.#getFileURI()
+    }
+    return this.#fileuri
   }
   content(replaceNewlines){
     if(this.isContent()){
@@ -201,13 +221,11 @@ class FileSystemResult{
     }
     return FileSystem.readFileSync(this.#result).content()
   }
-  async read(){
+  read(){
     if(!this.isFile()){
-      throw new Error("Can't read: not a file")
+      return Promise.reject(new Error("Can't read: not a file"))
     }
-    return FileSystemResult.fromContent({
-      content: await IOUtils.readUTF8(this.#result.path)
-    }).content()
+    return IOUtils.readUTF8(this.#result.path)
   }
   get type(){
     return this.#type
