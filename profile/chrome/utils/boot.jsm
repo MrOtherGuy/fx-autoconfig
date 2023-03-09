@@ -612,7 +612,59 @@ const utils = {
     return true
   },
   
-  openScriptDir: () => utils.showFileOrDirectory(FS.getEntry("",{baseDirectory: FS.SCRIPT_DIR}).entry())
+  openScriptDir: () => utils.showFileOrDirectory(FS.getEntry("",{baseDirectory: FS.SCRIPT_DIR}).entry()),
+  
+  /** LEGACY FileSystem helpers, don't use - will be removed in near future
+   *  Use _ucUtils.fs. methods instead.
+   */
+  readFile: function (aFile, metaOnly = false, replaceNewlines = true){
+    let result = FS.readFileSync(aFile,{metaOnly: metaOnly});
+    if(result.isError()){
+      return null
+    }
+    if(!result.isContent()){
+      throw new Error("aFile is not a readable file")
+    }
+    return result.content(replaceNewlines)
+  },
+  
+  readFileAsync: async function(path){
+    let result = await FS.readFile(path);
+    return result.content()
+  },
+  
+  readJSON: function(path){
+    return FS.readJSON(path);
+  },
+  
+  writeFile: function(path, content, options = {}){
+    return FS.writeFile(path, content, options)
+  },
+  
+  createFileURI: (fileName = "") => FS.createFileURI(fileName),
+  
+  get chromeDir(){
+    return {
+      get files(){
+        const dir = Services.dirsvc.get('UChrm',Ci.nsIFile);
+        return dir.directoryEntries.QueryInterface(Ci.nsISimpleEnumerator)
+      },
+      uri: FS.BASE_FILEURI
+    }
+  },
+  
+  getFSEntry: (fileName, autoEnumerate = true) => {
+    let result = FS.getEntry(fileName);
+    if(result.isError() || result.isContent()){
+      return null
+    }
+    if(result.isDirectory() && autoEnumerate){
+      return result.entry().directoryEntries.QueryInterface(Ci.nsISimpleEnumerator)
+    }
+    return result.entry()
+  }
+  
+  
 }
 
 Object.freeze(utils);

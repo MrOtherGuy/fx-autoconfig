@@ -110,7 +110,7 @@ class FileSystem{
   }
   static async readFile(aPath){
     if(typeof aPath !== "string"){
-      return Promise.reject("fs.readFile: path is not a string")
+      throw "fs.readFile: path is not a string"
     }
     try{
       let path = this.convertResourceRelativeURI(aPath);

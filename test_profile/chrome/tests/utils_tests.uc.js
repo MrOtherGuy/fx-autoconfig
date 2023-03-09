@@ -55,8 +55,10 @@ Above line is also left empty
   "test_module_script.sys.mjs",
   "test_module_script.uc.js",
   "test_registering_manifest",
+  "legacy_tests.uc.js",
   "utils_tests.uc.js",
-  "write_to_shared.uc.js"
+  "write_to_shared.uc.js",
+  "x_disabled_test.uc.js"
   ];
   console.info("%crunning tests...","color: rgb(120,160,240)");
   
@@ -270,7 +272,7 @@ Above line is also left empty
                     .join(",")
       return scripts.length + ";" + names
     }
-  ).expect(TEST_FILES.length+";,test_module_script,test_module_script_ESM,test_registering_manifest,test_runner,test_utils,write-42"),
+  ).expect(TEST_FILES.length+";,test_module_script,test_module_script_ESM,test_registering_manifest,test_runner,test_utils,test_utils_legacy,write-42,x_disabled"),
 
   // Tests load order.
   // The current script (this one) should be false.
@@ -288,7 +290,7 @@ Above line is also left empty
               .map(a => a.isRunning)
               .join(",");
     }
-  ).expect("false,true,true,false,true,false,true"),
+  ).expect("false,true,true,false,true,false,false,true,false"),
   
   // Test invalid getScriptData() filter 1
   new Test(
