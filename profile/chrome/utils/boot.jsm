@@ -1,6 +1,8 @@
 let EXPORTED_SYMBOLS = [];
 
 console.warn( "Browser is executing custom scripts via autoconfig" );
+
+const FX_AUTOCONFIG_VERSION = "0.7";
 const Services =
   globalThis.Services ||
   ChromeUtils.import("resource://gre/modules/Services.jsm").Services;
@@ -268,7 +270,7 @@ function updateStyleSheet(name,type) {
 }
 
 const utils = {
-  
+  get version(){ return FX_AUTOCONFIG_VERSION },
   get sharedGlobal(){ return SHARED_GLOBAL },
   
   get brandName(){ return AppConstants.MOZ_APP_DISPLAYNAME_DO_NOT_USE },
