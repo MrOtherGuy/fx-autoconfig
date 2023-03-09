@@ -549,7 +549,7 @@ Note that the callback will be invoked when any pref that starts with `userChrom
 _ucUtils.prefs.removeListener(prefListener) // from above example
 ```
 
-## Filesystem
+## Filesystem general
 
 Scripts should generally use the `resources` folder for their files. The helper functions interacting with filesystem expect `resources` to be the root folder for script operations.
 
@@ -562,6 +562,158 @@ The resources folder is registered to chrome:// scheme so scripts and stylesheet
 Scripts folder is registered to: `chrome://userScripts/content/`
 
 The loader module folder is registered to `chrome://userchromejs/content/`
+
+### \_ucUtils.openScriptDir() -> Boolean
+
+```js
+_ucUtils.openScriptDir();
+```
+
+Tries to open your script directory in OS file manager. Returns true or false indicating success. Whether this works or not probably depends on your OS. Only tested on Windows 10.
+
+## Filesystem \_ucUtils.fs
+
+These APIs exist starting from versioned release "0.7".
+
+Main idea is that various methods return a `FileSystemResult` object instead of the actual operation result directly.
+
+The `FileSystemResult` result object is one of four types:
+* `Filesystem.RESULT_FILE` get reference to a file
+* `Filesystem.RESULT_DIRECTORY` get referece to a directory
+* `Filesystem.RESULT_ERROR` non-existent file or other kind of error
+* `Filesystem.RESULT_CONTENT` file read operation results
+
+The result object has various methods to access underlying data.
+
+```js
+// return nsIFile object representing either a file a directory
+// throws if called on CONTENT or ERROR types
+fsResult.entry()
+
+// return the file text content as string
+// throws if called on anything except CONTENT type
+fsResult.content() // returns content that was read 
+
+// return an iterator over files in a directory
+// Note, the individual entries are nsIFile objects, not wrapped `FileSystemResult`s
+// throws when called on anything except DIRECTORY type
+fsResult.entries()
+// entries() is called internally if you try to iterate over the result:
+fsResult = _ucUtils.getEntry("my_dir");
+for(let file of fsResult){
+  ...
+}
+
+// size of read content or size of the file on disk
+fsResult.size
+
+// Read the content of this FileSystemResult
+// throws if called on non-FILE type
+let content = await fsResult.read() // Async read
+console.log(content);
+<< "Hello world!"
+
+// throws if called on non-FILE type
+let sync_content = fsResult.readSync();
+console.log(content);
+<< "Hello world!"
+
+// get a file URI for this result
+console.log(fsResult.fileURI)
+<< file:///c:/temp/things/some.txt
+
+// Tries to open a given file entry path in OS file manager.
+// Returns true or false indicating success.
+// Whether this works or not probably depends on your OS.
+// Only tested on Windows 10.
+fsResult.showInFileManager()
+
+```
+
+### \_ucUtils.fs.getEntry(fileName) -> FileSystemResult
+
+```js
+let fsResult = _ucUtils.fs.getEntry("some.txt");
+result.isFile()
+// true
+
+let nonexistent = _ucUtils.fs.getEntry("nonexistent.txt");
+nonexistent.isError()
+// true
+
+let dir = _ucUtils.fs.getEntry("directory");
+dir.isDirectory()
+// true
+```
+
+### \_ucUtils.fs.readFile(fileName) -> Promise\<FileSystemResult\>
+
+Asynchronously read a file. Throws if the argument is not a string
+
+```js
+let fsResult = await _ucUtils.fs.readFile("some.txt");
+fsResult.isFile()
+// false
+fsResult.isContent()
+// true
+console.log(fsResult.content())
+// "Hello world!"
+```
+
+### \_ucUtils.fs.readFileSync(some) -> FileSystemResult
+
+Synchronously read a file. The argument can be either a string representing filename or referece to a nsIFile object.
+
+```js
+let fsResult = _ucUtils.fs.readFileSync("some.txt");
+fsResult.isContent()
+// true
+console.log(fsResult.content())
+// "Hello world!"
+```
+
+### \_ucUtils.fs.readJSON(fileName) -> Promise\<Object | null\>
+
+Asynchronously try to read a file and parse it as json. If file can't be parsed then returns `null`.
+
+```js
+let fsResult = await _ucUtils.fs.readJSON("some.json")
+```
+
+### \_ucUtils.fs.writeFile(fileName, content, options) -> Promise\<Number\>
+
+```js
+let some_content = "Hello world!\n";
+let bytes = await _ucUtils.fs.writeFile( "hello.txt", some_content );
+console.log(bytes);
+
+<< 13
+```
+
+Write the content into file **as UTF8**. On successful write the promise is resolved with number of written bytes.
+
+By default writing files using this API is only allowed in **resources** directory. Calling `writeFile` with fileName like "../test.txt" will then reject the promise. You must set pref `userChromeJS.allowUnsafeWrites` to `true` to allow writing outside of resources.
+
+**Note!** Currently this method **replaces** the existing file if one exists.
+
+The optional `options` argument is currently only used to pass a filename for temp file. By default it is derived from fileName. 
+
+### \_ucUtils.fs.chromeDir() -> FileSystemResult
+
+Returns `FileSystemResult` with type DIRECTORY for the profile `chrome` directory
+
+```js
+let fsResult = _ucUtils.fs.chromeDir();
+let uri = _ucUtils.chromeDir.fileURI // a file:/// uri
+
+for (let file of fsResult){ // equal to fsResult.entries()
+  console.log(file.leafName);
+}
+```
+
+## Filesystem methods (deprecated, don't use)
+
+**Attention!** Don't use these anymore. First versioned build `"0.7"` introduced a new `_ucUtils.fs` API that you should use instead. These old methods will be removed in `"0.8"` which will be released with Firefox ESR 115
 
 ### \_ucUtils.getFSEntry(fileName) -> nsIFile || enumerator for entries in a folder
 
@@ -662,23 +814,6 @@ _ucUtils.createFileURI("path\some.png")
 ```
 
 Return a valid file uri describing `<profileDir>\chrome\resources\path\some.png`
-
-### \_ucUtils.showFileOrDirectory(nsIFile) -> Boolean
-
-```js
-let file = _ucUtils.getFSEntry("my_test_file.txt"); // a nsIFile object
-_ucUtils.showFileOrDirectory(file);
-```
-
-Tries to open a given file entry path in OS file manager. Returns true or false indicating success. Whether this works or not probably depends on your OS. Only tested on Windows 10.
-
-### \_ucUtils.openScriptDir() -> Boolean
-
-```js
-_ucUtils.openScriptDir();
-```
-
-Tries to open your script directory in OS file manager. Returns true or false indicating success. Whether this works or not probably depends on your OS. Only tested on Windows 10.
 
 ### \_ucUtils.chromeDir
 
