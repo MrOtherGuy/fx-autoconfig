@@ -6,7 +6,6 @@ const Services =
 
 class FileSystem{
   static PROFILE_DIR = Services.dirsvc.get("ProfD", Ci.nsIFile).path;
-  
   static RESULT_CONTENT = Symbol("Content");
   static RESULT_DIRECTORY = Symbol("Directory");
   static RESULT_ERROR = Symbol("Error");
@@ -264,7 +263,21 @@ class FileSystemResult{
       },
     };
   }
-  
+  showInFileManager(){
+    try{
+      if(this.isFile()){
+        this.#result.reveal();
+        return true
+      }
+      if(this.isDirectory()){
+        this.#result.launch();
+        return true
+      }
+    }catch(ex){
+      console.error("Could not open file manager for: " + this.#result.leafName);
+    }
+    return false 
+  }
   static fromDirectory(dir){
     return new FileSystemResult(dir, FileSystem.RESULT_DIRECTORY)
   }

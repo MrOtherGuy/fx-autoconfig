@@ -594,27 +594,7 @@ const utils = {
   
   parseStringAsScriptInfo: (aName, aString) => ScriptInfo.fromString(aName, FS.StringContent({content: aString})),
   
-  showFileOrDirectory: function (aEntry){
-    if(!(aEntry instanceof Ci.nsIFile)){
-      throw new Error("aEntry must be a nsIFile object")
-    }
-    if(!aEntry.exists()){
-      return false
-    }
-    try{
-      if(aEntry.isDirectory()){
-        aEntry.launch();
-      }else if(aEntry.isFile()){
-        aEntry.reveal()
-      }
-    }catch(ex){
-      console.error("Could not open file manager for: " + aEntry.leafName);
-      return false
-    }
-    return true
-  },
-  
-  openScriptDir: () => utils.showFileOrDirectory(FS.getEntry("",{baseDirectory: FS.SCRIPT_DIR}).entry()),
+  openScriptDir: () => FS.getEntry("",{baseDirectory: FS.SCRIPT_DIR}).showInFileManager(),
   
   /** LEGACY FileSystem helpers, don't use - will be removed in near future
    *  Use _ucUtils.fs. methods instead.
@@ -665,7 +645,6 @@ const utils = {
     }
     return result.entry()
   }
-  
   
 }
 
