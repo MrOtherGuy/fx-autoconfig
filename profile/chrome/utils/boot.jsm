@@ -403,6 +403,9 @@ const utils = {
     }
     let disabledScripts = yPref.get(PREF_SCRIPTSDISABLED).split(",");
     for(let item of menu.children){
+      if(item.getAttribute("type") != "checkbox"){
+        continue
+      }
       if (disabledScripts.includes(item.getAttribute("filename"))){
         item.removeAttribute("checked");
       }else{
