@@ -180,18 +180,13 @@ class FileSystemResult{
     this.#result = data;
     this.#type = resultType;
   }
-  #getFileURI(){
-    if(this.isContent()){
-      return this.#result.path
-    }
-    return FileSystem.getFileURIForFile(this.#result,this.#type)
-  }
+  
   get fileURI(){
     if(this.isError()){
       return null
     }
     if(!this.#fileuri){
-      this.#fileuri = this.#getFileURI()
+      this.#fileuri = FileSystemResult.#getFileURI(this)
     }
     return this.#fileuri
   }
@@ -277,6 +272,12 @@ class FileSystemResult{
       console.error("Could not open file manager for: " + this.#result.leafName);
     }
     return false 
+  }
+  static #getFileURI(aResult){
+    if(aResult.isContent()){
+      return aResult.#result.path
+    }
+    return FileSystem.getFileURIForFile(aResult.#result,aResult.#type)
   }
   static fromDirectory(dir){
     return new FileSystemResult(dir, FileSystem.RESULT_DIRECTORY)
