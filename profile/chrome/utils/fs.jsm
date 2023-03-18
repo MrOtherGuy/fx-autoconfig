@@ -19,7 +19,7 @@ class FileSystem{
     if(type === this.RESULT_FILE){
       return qi.getURLSpecFromActualFile(aEntry)
     }
-    throw new Error("type argument must be either RESULT_FILE or RESULT_DIRECTORY")
+    throw ResultError.fromKind(this.ERROR_KIND_INVALID_ARGUMENT,{expected: "FileSystem.RESULT_FILE | FileSystem.RESULT_DIRECTORY"})
   }
 
   static resolveChromePath(str){
@@ -45,7 +45,7 @@ class FileSystem{
   
   static #getEntry(aFilename, baseDirectory){
     if(typeof aFilename !== "string"){
-      return FileSystemResult.fromError(new Error("Filename is not a string"))
+      return FileSystemResult.fromErrorKind(FileSystem.ERROR_KIND_INVALID_ARGUMENT,"String");
     }
     const filename = aFilename.replace("\\","/");
     let pathParts = ((filename.startsWith("..") ? "" : baseDirectory) + "/" + filename).split("/").filter( (a) => (!!a && a != "..") );
@@ -55,7 +55,7 @@ class FileSystem{
       entry.append(part)
     }
     if(!entry.exists()){
-      return FileSystemResult.fromError(new Error("File doesn't exist"))
+      return FileSystemResult.fromErrorKind(FileSystem.ERROR_KIND_NOT_EXIST)
     }
     return FileSystemResult.fromNsIFile(entry)
   }
@@ -66,12 +66,19 @@ class FileSystem{
   
   static readFileSync(aFile, options = {}) {
     if(typeof aFile === "string"){
-      aFile = this.#getEntry(aFile, this.RESOURCE_DIR).entry();
+      const fsResult = this.#getEntry(aFile, this.RESOURCE_DIR);
+      if(fsResult.isError()){
+        return fsResult
+      }
+      if(fsResult.isFile()){
+        aFile = fsResult.entry();
+      }else{
+        return FileSystemResult.fromErrorKind(this.ERROR_KIND_NOT_FILE)
+      }
+    }else if(!(aFile instanceof Ci.nsIFile && aFile.exists() && aFile.isFile())){
+      return FileSystemResult.fromErrorKind(this.ERROR_KIND_NOT_FILE)
     }
-    // aFile should now be nsIFile which might be either directory, file or not exist
-    if(!aFile.isFile()){
-      throw new Error("aFile is not a readable file")
-    }
+    // aFile should now be nsIFile mapping to a file
     let stream = Cc['@mozilla.org/network/file-input-stream;1'].createInstance(Ci.nsIFileInputStream);
     let cvstream = Cc['@mozilla.org/intl/converter-input-stream;1'].createInstance(Ci.nsIConverterInputStream);
     try{
@@ -81,7 +88,7 @@ class FileSystem{
       console.error(e);
       cvstream.close();
       stream.close();
-      return FileSystemResult.fromError(new Error(`File stream initialization failed for '${aFile.leafName}`))
+      return FileSystemResult.fromError(this.ERROR_KIND_NOT_READABLE,{cause: e},{filename: aFile.leafName})
     }
     let rv = {content:'',path: this.getFileURIForFile(aFile,this.RESULT_FILE)};
     let data = {};
@@ -109,14 +116,14 @@ class FileSystem{
   }
   static async readFile(aPath){
     if(typeof aPath !== "string"){
-      throw "fs.readFile: path is not a string"
+      throw ResultError.fromKind(this.ERROR_KIND_INVALID_ARGUMENT,{expected: "string"})
     }
     try{
       let path = this.convertResourceRelativeURI(aPath);
       return FileSystemResult.fromContent({ content: await IOUtils.readUTF8(path), path: PathUtils.toFileURI(path) })
     }catch(ex){
       console.error(ex)
-      return FileSystemResult.fromError(ex)
+      return FileSystemResult.fromError(this.ERROR_KIND_NOT_READABLE,{cause: ex})
     }
   }  
   static async readJSON(path){
@@ -132,10 +139,10 @@ class FileSystem{
   }  
   static async writeFile(path, content, options = {}){
     if(!path || typeof path !== "string"){
-      throw "writeFile: path is invalid"
+      throw ResultError.fromKind(this.ERROR_KIND_INVALID_ARGUMENT,{expected: "string"})
     }
     if(typeof content !== "string"){
-      throw "writeFile: content to write must be a string"
+      throw ResultError.fromKind(this.ERROR_KIND_INVALID_ARGUMENT,{expected: "string"})
     }
 
     let base = ["chrome",this.RESOURCE_DIR];
@@ -147,7 +154,7 @@ class FileSystem{
 
     while(parts[0] === ".."){
       if(disallowUnsafeWrites){
-        throw "Writing outside of resources directory is not allowed"
+        throw ResultError.fromKind(this.ERROR_KIND_NOT_ALLOWED)
       }
       base.pop();
       parts.shift();
@@ -169,6 +176,51 @@ class FileSystem{
   }
   static StringContent(obj){
     return FileSystemResult.fromContent(obj)
+  }
+  static ERROR_KIND_NOT_EXIST = 1;
+  static ERROR_KIND_NOT_DIRECTORY = 2;
+  static ERROR_KIND_NOT_FILE = 3;
+  static ERROR_KIND_NOT_CONTENT = 4;
+  static ERROR_KIND_UNKNOWN_RESULT = 5;
+  static ERROR_KIND_INVALID_ARGUMENT = 6;
+  static ERROR_KIND_NOT_READABLE = 7;
+  static ERROR_KIDN_NOT_ALLOWED = 8;
+}
+
+class ResultError extends Error{
+  
+  constructor(kind,options,info = {}){
+    super(ResultError.toMessage(kind,info),options);
+    this.kind = kind;
+    this.name = "ResultError";
+  }
+  static toMessage(kind,info){
+    switch(kind){
+      case FileSystem.ERROR_KIND_NOT_EXIST:
+        return "Entry doesn't exist"
+      case FileSystem.ERROR_KIND_NOT_DIRECTORY:
+        return "Result is not a directory"
+      case FileSystem.ERROR_KIND_NOT_FILE:
+        return "Result is not a file"
+      case FileSystem.ERROR_KIND_NOT_CONTENT:
+        return "Result is not content"
+      case FileSystem.ERROR_KIND_UNKNOWN_RESULT:
+        return "Unknown result type: " + this.parseInfo(info)
+      case FileSystem.ERROR_KIND_INVALID_ARGUMENT:
+        return "Invalid argument: " + this.parseInfo(info)
+      case FileSystem.ERROR_KIND_NOT_READABLE:
+        return "File stream is not readable: " + this.parseInfo(info)
+      case FileSystem.ERROR_KIND_NOT_ALLOWED:
+        return "Writing outside of resources directory is not allowed"
+      default:
+        return "Unknown error"
+    }
+  }
+  static parseInfo(aInfo){
+    return Object.entries(aInfo).map(a => `${a[0]}: ${a[1]}`).join("; ")
+  }
+  static fromKind(aKind,info){
+    return new ResultError(aKind,{},info)
   }
 }
 
@@ -196,7 +248,7 @@ class FileSystemResult{
           ? this.#result.content.replace(/\r\n?/g, '\n')
           : this.#result.content
     }
-    throw new Error("FSResult is not fileContent but of type: "+this.#type.description)
+    throw ResultError.fromKind(FileSystem.ERROR_KIND_NOT_CONTENT,this.#type.description)
   }
   get size(){
     return this.isContent()
@@ -207,17 +259,22 @@ class FileSystemResult{
     if(this.isDirectory() || this.isFile()){
       return this.#result
     }
-    throw new Error("FSResult is not a file or directory")
+    throw ResultError.fromKind(FileSystem.ERROR_KIND_NOT_EXIST)
+  }
+  error(){
+    return this.isError()
+          ? this.#result
+          : null
   }
   readSync(){
     if(!this.isFile()){
-      throw new Error("Can't read: not a file")
+      throw ResultError.fromKind(FileSystem.ERROR_KIND_NOT_FILE)
     }
     return FileSystem.readFileSync(this.#result).content()
   }
   read(){
     if(!this.isFile()){
-      return Promise.reject(new Error("Can't read: not a file"))
+      return Promise.reject(ResultError.fromKind(FileSystem.ERROR_KIND_NOT_FILE))
     }
     return IOUtils.readUTF8(this.#result.path)
   }
@@ -241,7 +298,7 @@ class FileSystemResult{
   };
   entries(){
     if(!this.isDirectory()){
-      throw new Error("Can't iterate - not a directory")
+      throw ResultError.fromKind(FileSystem.ERROR_KIND_NOT_DIRECTORY)
     }
     let enumerator = this.#result.directoryEntries.QueryInterface(Ci.nsISimpleEnumerator);
     return {
@@ -285,8 +342,11 @@ class FileSystemResult{
   static fromContent(content){
     return new FileSystemResult(content, FileSystem.RESULT_CONTENT)
   }
-  static fromError(error){
-    return new FileSystemResult(error, FileSystem.RESULT_ERROR)
+  static fromError(aKind,aErrorDescription){
+    return new FileSystemResult(new ResultError(aKind, aErrorDescription), FileSystem.RESULT_ERROR)
+  }
+  static fromErrorKind(aKind){
+    return new FileSystemResult(ResultError.fromKind(aKind), FileSystem.RESULT_ERROR)
   }
   static fromFile(file){
     return new FileSystemResult(file, FileSystem.RESULT_FILE)
@@ -296,8 +356,7 @@ class FileSystemResult{
       return FileSystemResult.fromDirectory(entry)
     }else if(entry.isFile()){
       return FileSystemResult.fromFile(entry)
-    }else{
-      return FileSystemResult.fromError(new Error("Unknown file result"))
     }
+    return FileSystemResult.fromError(ResultError.fromKind(FileSystem.ERROR_KIND_UNKNOWN_RESULT))
   }
 }
