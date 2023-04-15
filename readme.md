@@ -52,10 +52,11 @@ Copy `defaults/` and `config.js` to `/Applications/Firefox.app/Contents/Resource
 Copy the contents of the folder "profile" (not the folder itself) to the Firefox profile folder that you want to modify. If the profile already has a `chrome` folder (for userChrome.css or userContent.css) then the chrome folders should merge. Otherwise the chrome folder will be created.
 You should end up with `chrome` folder in the profile root, and three folders inside it - JS, resources and utils.
 
-There will be two files in the `chrome/utils/` folder:
+There will be three files in the `chrome/utils/` folder:
 
 * `chrome.manifest` - registers file paths to chrome:// protocol
 * `boot.jsm` - implements user-script loading logic
+* `fs.jsm` - implements filesystem-related functions - `boot.jsm` uses this file internally.
 
 ## Deleting startup-cache
 
