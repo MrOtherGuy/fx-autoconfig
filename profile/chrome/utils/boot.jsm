@@ -745,7 +745,7 @@ class UserChrome_js{
       if (/(.+\.uc\.js|.+\.sys\.mjs)$/i.test(entry.leafName)) {
         let script = ScriptData.fromFile(entry);
         this.scripts.push(script);
-        const scriptIsEnabled = !disabledScripts.includes(script.fileName);
+        const scriptIsEnabled = !disabledScripts.includes(script.filename);
         if(scriptIsEnabled && script.manifest){
           try{
             script.registerManifest();
