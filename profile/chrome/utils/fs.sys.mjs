@@ -1,10 +1,4 @@
-let EXPORTED_SYMBOLS = ["FileSystem"];
-
-const Services =
-  globalThis.Services ||
-  ChromeUtils.import("resource://gre/modules/Services.jsm").Services;
-
-class FileSystem{
+export class FileSystem{
   static PROFILE_DIR = Services.dirsvc.get("ProfD", Ci.nsIFile).path;
   static RESULT_CONTENT = Symbol("Content");
   static RESULT_DIRECTORY = Symbol("Directory");

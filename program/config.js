@@ -7,7 +7,7 @@ try {
   
   if(cmanifest.exists()){
     Components.manager.QueryInterface(Ci.nsIComponentRegistrar).autoRegister(cmanifest);
-    ChromeUtils.import('chrome://userchromejs/content/boot.jsm');
+    ChromeUtils.importESModule('chrome://userchromejs/content/boot.sys.mjs');
   }
 
 } catch(ex) {};

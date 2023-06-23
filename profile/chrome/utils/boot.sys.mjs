@@ -1,13 +1,8 @@
-let EXPORTED_SYMBOLS = [];
+import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
+import { FileSystem } from "chrome://userchromejs/content/fs.sys.mjs";
 
+const FX_AUTOCONFIG_VERSION = "0.8";
 console.warn( "Browser is executing custom scripts via autoconfig" );
-
-const FX_AUTOCONFIG_VERSION = "0.7";
-const Services =
-  globalThis.Services ||
-  ChromeUtils.import("resource://gre/modules/Services.jsm").Services;
-const {AppConstants} = ChromeUtils.import('resource://gre/modules/AppConstants.jsm');
-const FS = ChromeUtils.import("chrome://userchromejs/content/fs.jsm").FileSystem;
 
 const yPref = {
   get: function (prefPath) {
