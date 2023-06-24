@@ -1,6 +1,6 @@
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 import { FileSystem as FS } from "chrome://userchromejs/content/fs.sys.mjs";
-import { UCUtils as utils, ScriptInfo } from "chrome://userchromejs/content/utils.sys.mjs";
+import { UCUtils as utils, ScriptInfo, loaderModuleLink } from "chrome://userchromejs/content/utils.sys.mjs";
 
 const FX_AUTOCONFIG_VERSION = "0.8";
 console.warn( "Browser is executing custom scripts via autoconfig" );
@@ -247,11 +247,7 @@ class UserChrome_js{
     if(this.initialized){
       return
     }
-    try{
-    utils._linkLoaderModule(this,FX_AUTOCONFIG_VERSION,AppConstants.MOZ_APP_DISPLAYNAME_DO_NOT_USE,APP_VARIANT,SHARED_GLOBAL,ScriptData);
-    }catch(ex){
-      console.error(ex)
-    }
+    loaderModuleLink.setup(this,FX_AUTOCONFIG_VERSION,AppConstants.MOZ_APP_DISPLAYNAME_DO_NOT_USE,APP_VARIANT,SHARED_GLOBAL,ScriptData);
     // gBrowserHack setup
     const gBrowserHackRequired = Services.prefs.getBoolPref("userChromeJS.gBrowser_hack.required",false) ? 2 : 0;
     const gBrowserHackEnabled = Services.prefs.getBoolPref(PREF_GBROWSERHACKENABLED,false) ? 1 : 0;
