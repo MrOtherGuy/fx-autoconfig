@@ -102,32 +102,20 @@ function updateStyleSheet(name,type) {
 }
 // This stores data we need to link from the boot.sys.mjs
 export const loaderModuleLink = new (function(){
-  let loaderScripts = null;
-  let version = null;
-  let sharedGlobal = null;
-  let brandName = null;
-  let variant = null;
-  let scriptDataConstructor = null;
   let sessionRestored = false;
   this.setup = (ref,aVersion,aBrandName,aVariant,aSharedGlobal,aScriptData) => {
-    loaderScripts = ref.scripts;
-    version = aVersion;
-    sharedGlobal = aSharedGlobal;
-    brandName = aBrandName;
-    variant = aVariant;
-    scriptDataConstructor = aScriptData;
+    this.scripts = ref.scripts;
+    this.version = aVersion;
+    this.sharedGlobal = aSharedGlobal;
+    this.brandName = aBrandName;
+    this.variant = aVariant;
+    this.scriptDataConstructor = aScriptData;
     delete this.setModuleInfo;
     Object.freeze(this);
     return null
   }
   this.setSessionRestored = () => { sessionRestored = true };
   this.sessionRestored = () => sessionRestored;
-  this.version = () => version;
-  this.sharedGlobal = () => sharedGlobal;
-  this.brandName = () => brandName;
-  this.getScripts = () => loaderScripts;
-  this.variant = () => variant;
-  this.scriptDataConstructor = () => scriptDataConstructor;
   return this
 })();
 
@@ -146,7 +134,7 @@ export class ScriptInfo{
     return info
   }
   static fromString(aName, aStringAsFSResult) {
-    const ScriptData = loaderModuleLink.scriptDataConstructor();
+    const ScriptData = loaderModuleLink.scriptDataConstructor;
     const headerText = ScriptData.extractHeaderText(aStringAsFSResult);
     const scriptData = new ScriptData(aName, headerText, headerText.length > aStringAsFSResult.size - 2);
     return ScriptInfo.fromScript(scriptData, false)
@@ -155,12 +143,12 @@ export class ScriptInfo{
 
 export class UCUtils{
   static get appVariant(){
-    return loaderModuleLink.variant().THUNDERBIRD
+    return loaderModuleLink.variant.THUNDERBIRD
     ? "Thunderbird"
     : "Firefox"
   }
   static get brandName(){
-    return loaderModuleLink.brandName()
+    return loaderModuleLink.brandName
   }
   static createElement(doc,tag,props,isHTML = false){
     let el = isHTML ? doc.createElement(tag) : doc.createXULElement(tag);
@@ -196,7 +184,7 @@ export class UCUtils{
         : `url(chrome://userChrome/content/${desc.image});`;
       itemStyle += desc.style || "";
     }
-    loaderModuleLink.sharedGlobal().widgetCallbacks.set(desc.id,desc.callback);
+    loaderModuleLink.sharedGlobal.widgetCallbacks.set(desc.id,desc.callback);
 
     return CUI.createWidget({
       id: desc.id,
@@ -226,7 +214,7 @@ export class UCUtils{
     if(aFilter && !(filterType === "string" || filterType === "function")){
       throw "getScriptData() called with invalid filter type: "+filterType
     }
-    const _ucScripts = loaderModuleLink.getScripts();
+    const _ucScripts = loaderModuleLink.scripts;
     if(filterType === "string"){
       let script = _ucScripts.find(s => s.filename === aFilter);
       return script ? script.getInfo() : null;
@@ -242,7 +230,7 @@ export class UCUtils{
     );
   }
   static loadURI(win,desc){
-    if(loaderModuleLink.variant().THUNDERBIRD){
+    if(loaderModuleLink.variant.THUNDERBIRD){
       console.warn("_ucUtils.loadURI is not supported on Thunderbird");
       return false
     }
@@ -336,10 +324,10 @@ export class UCUtils{
     return false
   }
   static get sharedGlobal(){
-    return loaderModuleLink.sharedGlobal()
+    return loaderModuleLink.sharedGlobal
   }
   static async showNotification(description){
-    if(loaderModuleLink.variant().THUNDERBIRD){
+    if(loaderModuleLink.variant.THUNDERBIRD){
       console.warn('_ucUtils.showNotification is not supported on Thunderbird\nNotification label was: "'+description.label+'"');
       return
     }
@@ -384,7 +372,7 @@ export class UCUtils{
       if(loaderModuleLink.sessionRestored()){
         resolve();
       }else{
-        const obs_topic = loaderModuleLink.variant().FIREFOX
+        const obs_topic = loaderModuleLink.variant.FIREFOX
                     ? "sessionstore-windows-restored"
                     : "mail-delayed-startup-finished";
                     
@@ -423,13 +411,13 @@ export class UCUtils{
     return updateStyleSheet(name,type)
   }
   static get version(){
-    return loaderModuleLink.version()
+    return loaderModuleLink.version
   }
   static windowIsReady(win){
     if(win && win.isChromeWindow){
       return new Promise(resolve => {
         
-        if(loaderModuleLink.variant().FIREFOX){
+        if(loaderModuleLink.variant.FIREFOX){
           if(win.gBrowserInit.delayedStartupFinished){
             resolve();
             return
@@ -440,7 +428,7 @@ export class UCUtils{
             return
           }
         }
-        const obs_topic = loaderModuleLink.variant().FIREFOX
+        const obs_topic = loaderModuleLink.variant.FIREFOX
                           ? "browser-delayed-startup-finished"
                           : "mail-delayed-startup-finished";
                     
@@ -460,7 +448,7 @@ export class UCUtils{
   static get windows(){
     return {
       get: function (onlyBrowsers = true) {
-        let windowType = loaderModuleLink.variant().FIREFOX ? "navigator:browser" : "mail:3pane";
+        let windowType = loaderModuleLink.variant.FIREFOX ? "navigator:browser" : "mail:3pane";
         let windows = Services.wm.getEnumerator(onlyBrowsers ? windowType : null);
         let wins = [];
         while (windows.hasMoreElements()) {
