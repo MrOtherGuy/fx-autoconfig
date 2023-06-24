@@ -17,6 +17,10 @@ new Test("ESM_import_some_equals_42",()=>{
   return some.test_value
 }).expect(42);
 
+new Test("ESM_import_version_is_string",()=>{
+  return (typeof some.loaderVersion)
+}).expect("string");
+
 new Test("ESM_import_set_value",()=>{
   some.setToX(123);
   return new Promise(res => {
