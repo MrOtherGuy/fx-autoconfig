@@ -52,6 +52,7 @@ Above line is also left empty
   const TEST_FILES = [
   "000_test_runner.sys.mjs",
   "aaa_test_script.uc.js",
+  "test_mjs.uc.mjs",
   "test_module_script.sys.mjs",
   "test_module_script.uc.js",
   "test_registering_manifest",
@@ -272,7 +273,7 @@ Above line is also left empty
                     .join(",")
       return scripts.length + ";" + names
     }
-  ).expect(TEST_FILES.length+";,test_module_script,test_module_script_ESM,test_registering_manifest,test_runner,test_utils,test_utils_legacy,write-42,x_disabled"),
+  ).expect(TEST_FILES.length+";,test_module_script,test_module_script_ESM,test_non_background_mjs,test_registering_manifest,test_runner,test_utils,test_utils_legacy,write-42,x_disabled"),
 
   // Tests load order.
   // The current script (this one) should be false.
@@ -290,7 +291,7 @@ Above line is also left empty
               .map(a => a.isRunning)
               .join(",");
     }
-  ).expect("false,true,true,false,true,false,false,true,false"),
+  ).expect("false,true,true,false,false,true,false,false,true,false"),
   
   // Test invalid getScriptData() filter 1
   new Test(

@@ -141,7 +141,7 @@ export class ScriptInfo{
   }
 }
 
-export class UCUtils{
+export class _ucUtils{
   static get appVariant(){
     return loaderModuleLink.variant.THUNDERBIRD
     ? "Thunderbird"
@@ -284,7 +284,7 @@ export class UCUtils{
         return false
       }
       
-      UCUtils.windows.forEach((doc,win) => {
+      _ucUtils.windows.forEach((doc,win) => {
         if(doc.getElementById(desc.id)){
           return
         }
@@ -295,10 +295,10 @@ export class UCUtils{
           details.keycode = `VK_${desc.key}`;
         }
 
-        let el = UCUtils.createElement(doc,"key",details);
+        let el = _ucUtils.createElement(doc,"key",details);
         
         el.addEventListener("command",(ev) => {func(ev.target.ownerGlobal,eToO(ev))});
-        let keyset = doc.getElementById("mainKeyset") || doc.body.appendChild(UCUtils.createElement(doc,"keyset",{id:"ucKeys"}));
+        let keyset = doc.getElementById("mainKeyset") || doc.body.appendChild(_ucUtils.createElement(doc,"keyset",{id:"ucKeys"}));
         keyset.insertBefore(el,keyset.firstChild);
       });
     }catch(e){
@@ -331,7 +331,7 @@ export class UCUtils{
       console.warn('_ucUtils.showNotification is not supported on Thunderbird\nNotification label was: "'+description.label+'"');
       return
     }
-    await UCUtils.startupFinished();
+    await _ucUtils.startupFinished();
     let window = description.window;
     if(!(window && window.isChromeWindow)){
       window = Services.wm.getMostRecentBrowserWindow();
@@ -391,7 +391,7 @@ export class UCUtils{
       return
     }
     const name = isElement ? el.getAttribute("filename") : el;
-    let script = UCUtils.getScriptData(name);
+    let script = _ucUtils.getScriptData(name);
     if(!script){
       return null
     }

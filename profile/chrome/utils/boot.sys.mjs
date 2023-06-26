@@ -1,6 +1,6 @@
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 import { FileSystem as FS } from "chrome://userchromejs/content/fs.sys.mjs";
-import { UCUtils as utils, ScriptInfo, loaderModuleLink } from "chrome://userchromejs/content/utils.sys.mjs";
+import { _ucUtils as utils, ScriptInfo, loaderModuleLink } from "chrome://userchromejs/content/utils.sys.mjs";
 
 const FX_AUTOCONFIG_VERSION = "0.8";
 console.warn( "Browser is executing custom scripts via autoconfig" );
@@ -32,6 +32,7 @@ function getDisabledScripts(){
 }
 
 class ScriptData {
+  #preCompiledESM;
   constructor(leafName, headerText, noExec){
     const hasLongDescription = (/^\/\/\ @long-description/im).test(headerText);
     this.filename = leafName;
@@ -50,9 +51,9 @@ class ScriptData {
     this.startup = headerText.match(/\/\/ @startup\s+(.+)\s*$/im)?.[1];
     this.id = headerText.match(/\/\/ @id\s+(.+)\s*$/im)?.[1]
            || `${leafName.split('.uc.js')[0]}@${this.author||'userChromeJS'}`;
-    this.isESM = this.filename.endsWith("sys.mjs");
+    this.isESM = this.filename.endsWith(".mjs");
     this.onlyonce = /\/\/ @onlyonce\b/.test(headerText);
-    this.inbackground = this.isESM || /\/\/ @backgroundmodule\b/.test(headerText);
+    this.inbackground = this.filename.endsWith(".sys.mjs") || /\/\/ @backgroundmodule\b/.test(headerText);
     this.ignoreCache = /\/\/ @ignorecache\b/.test(headerText);
     this.isRunning = false;
     this.manifest = headerText.match(/\/\/ @manifest\s+(.+)\s*$/im)?.[1];
@@ -86,36 +87,66 @@ class ScriptData {
   get isEnabled() {
     return getDisabledScripts().indexOf(this.filename) === -1;
   }
-  
-  tryLoadIntoWindow(win) {
+  getPreCompiledESM(){
+    return new Promise((res,rej) => {
+      if(this.#preCompiledESM){
+        res(this.#preCompiledESM)
+      }
+      ChromeUtils.compileScript(`data:,"use strict";import("chrome://userscripts/content/${this.filename}");`)
+      .then( precompiled => {
+        this.#preCompiledESM = precompiled;
+        res(precompiled)
+      })
+      .catch(rej)
+    })
+  }
+  tryLoadIntoWindow(win){
     if (this.inbackground || this.noExec || !this.regex.test(win.location.href)) {
       return
     }
-    try {
-      if(this.onlyonce && this.isRunning) {
-        if (this.startup) {
-          SHARED_GLOBAL[this.startup]._startup(win)
-        }
-        return
+    if(this.onlyonce && this.isRunning) {
+      if (this.startup) {
+        SHARED_GLOBAL[this.startup]._startup(win)
       }
-
-      Services.scriptloader.loadSubScriptWithOptions(
-        `chrome://userscripts/content/${this.filename}`,
-        {
-          target: win,
-          ignoreCache: this.ignoreCache
-        }
-      );
-      
-      this.isRunning = true;
-      this.startup && SHARED_GLOBAL[this.startup]._startup(win)
-      
-    } catch (ex) {
-      console.error(new Error(`@ ${this.filename}:${ex.lineNumber}`,{cause:ex}));
+      return
     }
-    return
+    const injection = this.isESM
+      ? ScriptData.injectESMIntoGlobal(this,win)
+      : ScriptData.injectClassicScriptIntoGlobal(this,win);
+    injection
+    .catch(ex => {
+      console.error(new Error(`@ ${this.filename}:${ex.lineNumber}`,{cause:ex}));
+    })
   }
-  
+  static markScriptRunning(aScript){
+    aScript.isRunning = true;
+    aScript.startup && SHARED_GLOBAL[aScript.startup]._startup(win)
+  }
+  static injectESMIntoGlobal(aScript,aGlobal){
+    return new Promise((resolve,reject) => {
+      aScript.getPreCompiledESM()
+      .then(script => script.executeInGlobal(aGlobal))
+      .then(script => ScriptData.markScriptRunning(aScript))
+      .then(resolve)
+      .catch(reject)
+    })
+  }
+  static injectClassicScriptIntoGlobal(aScript,aGlobal){
+    try{
+      Services.scriptloader.loadSubScriptWithOptions(
+        `chrome://userscripts/content/${aScript.filename}`,
+        {
+          target: aGlobal,
+          ignoreCache: aScript.ignoreCache
+        }
+      )
+      ScriptData.markScriptRunning(aScript)
+      return Promise.resolve(1)
+    }catch(ex){
+      ScriptData.markScriptRunning(aScript)
+      return Promise.reject(ex)
+    }
+  }
   getInfo(isEnabledOverride){
     return ScriptInfo.fromScript(this,isEnabledOverride === undefined ? this.isEnabled : isEnabledOverride);
   }
@@ -255,7 +286,7 @@ class UserChrome_js{
     const disabledScripts = getDisabledScripts();
     // load script data
     for(let entry of FS.getEntry('',{baseDirectory: FS.SCRIPT_DIR})){
-      if (/(.+\.uc\.js|.+\.sys\.mjs)$/i.test(entry.leafName)) {
+      if (/^\w+.*(\.uc\.js|\.uc\.mjs|\.sys\.mjs)$/i.test(entry.leafName)) {
         let script = ScriptData.fromFile(entry);
         this.scripts.push(script);
         const scriptIsEnabled = !disabledScripts.includes(script.filename);
@@ -291,8 +322,9 @@ class UserChrome_js{
       // Don't inject scripts to modal prompt windows or notifications
       return
     }
-    // TODO maybe store utils differently?
-    Object.defineProperty(window,"_ucUtils",{ get: () => utils });
+    ChromeUtils.defineESModuleGetters(window,{
+      _ucUtils: "chrome://userchromejs/content/utils.sys.mjs"
+    });
     document.allowUnsafeHTML = false; // https://bugzilla.mozilla.org/show_bug.cgi?id=1432966
     
     // This is a hack to make gBrowser available for scripts.
