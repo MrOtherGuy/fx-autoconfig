@@ -33,6 +33,7 @@ function getDisabledScripts(){
 
 class ScriptData {
   #preCompiledESM;
+  #preCompileStarted;
   constructor(leafName, headerText, noExec){
     const hasLongDescription = (/^\/\/\ @long-description/im).test(headerText);
     this.filename = leafName;
@@ -87,18 +88,33 @@ class ScriptData {
   get isEnabled() {
     return getDisabledScripts().indexOf(this.filename) === -1;
   }
-  getPreCompiledESM(){
-    return new Promise((res,rej) => {
-      if(this.#preCompiledESM){
-        res(this.#preCompiledESM)
-      }
-      ChromeUtils.compileScript(`data:,"use strict";import("chrome://userscripts/content/${this.filename}");`)
-      .then( precompiled => {
-        this.#preCompiledESM = precompiled;
-        res(precompiled)
+  preCompileMJS(){
+    // Note: #preCompiledESM can be "undefined" at this point if compilation failed
+    if(this.#preCompiledESM || this.#preCompileStarted){
+      return Promise.resolve(this.#preCompiledESM)
+    }
+    this.#preCompileStarted = true;
+    return new Promise((resolve,reject) => {
+      ChromeUtils.compileScript(`data:,"use strict";import("chrome://userscripts/content/${this.filename}").catch(console.error)`)
+      .then( script => {
+        this.#preCompiledESM = script;
+        resolve(script);
       })
-      .catch(rej)
+      .catch(reject)
     })
+  }
+  getPreCompiledESM(){
+    // This branch needs to exist because the script might have been disabled during startup, but it was enabled later and thus needs to be compiled first before it can run in new windowGlobal
+    if(!this.#preCompileStarted){
+      return new Promise((resolve,reject) => {
+        this.preCompileMJS()
+        .then( resolve )
+        .catch( ex => reject(new Error(`@ ${this.filename}: script couldn't be compiled because:`,{cause: ex}) ))
+      })
+    }
+    return this.#preCompiledESM
+      ? Promise.resolve(this.#preCompiledESM)
+      : Promise.reject(new Error(`@ ${this.filename}: script is not compiled yet`))
   }
   tryLoadIntoWindow(win){
     if (this.inbackground || this.noExec || !this.regex.test(win.location.href)) {
@@ -289,15 +305,17 @@ class UserChrome_js{
       if (/^\w+.*(\.uc\.js|\.uc\.mjs|\.sys\.mjs)$/i.test(entry.leafName)) {
         let script = ScriptData.fromFile(entry);
         this.scripts.push(script);
-        const scriptIsEnabled = !disabledScripts.includes(script.filename);
-        if(scriptIsEnabled && script.manifest){
+        if(disabledScripts.includes(script.filename)){
+          continue
+        }
+        if(script.manifest){
           try{
             script.registerManifest();
           }catch(ex){
             console.error(new Error(`@ ${script.filename}`,{cause:ex}));
           }
         }
-        if(scriptIsEnabled && script.inbackground){
+        if(script.inbackground){
           try{
             const fileName = `chrome://userscripts/content/${script.filename}`;
             if(script.isESM){
@@ -309,6 +327,9 @@ class UserChrome_js{
           }catch(ex){
             console.error(new Error(`@ ${script.filename}`,{cause:ex}));
           }
+        }
+        if(script.isESM && !script.inbackground){
+          script.preCompileMJS();
         }
       }
     }
