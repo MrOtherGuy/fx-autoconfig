@@ -4,15 +4,19 @@ The files in this repository create a toolkit to load arbitrary javascript files
 
 # Overview
 
-Files in `program` folder tell Firefox to load an additional javascript module file from the current Profile directory. The `boot.jsm` is the one that implements loading and managing additional files.
+Files in `program` folder tell Firefox to load an additional javascript module file from the current Profile directory. The `boot.sys.mjs` is the one that implements loading and managing additional files.
 
 Since the files in `program` go to the main program installation path, they will affect all profiles that are being run using that executable.
 
-However, the bulk of the logic is located in profile folder with `boot.jsm` so if the file is not found there then the loader is simply not used.
+However, the bulk of the logic is located in profile folder with `boot.sys.mjs` so if the file is not found there then the loader is simply not used.
+
+The loader module (`boot.sys.mjs`) depends on two additional files: `utils.sys.mjs` to which is collection of various helper functions you can use in your scripts and `fs.sys.mjs` to implement read and write operations on the file system.
+
+**Note** as of version "0.8" fx-autoconfig is incompatible with Firefox ESR 102
 
 ## Warning!
 
-Please note that malicious external programs can now inject custom logic to Firefox even without elevated privileges just by modifying boot.jsm or adding their own scripts.
+Please note that malicious external programs can now inject custom logic to Firefox even without elevated privileges just by modifying boot.sys.mjs or adding their own script files.
 
 # Install
 
@@ -55,14 +59,15 @@ You should end up with `chrome` folder in the profile root, and three folders in
 There will be three files in the `chrome/utils/` folder:
 
 * `chrome.manifest` - registers file paths to chrome:// protocol
-* `boot.jsm` - implements user-script loading logic
-* `fs.jsm` - implements filesystem-related functions - `boot.jsm` uses this file internally.
+* `boot.sys.mjs` - implements user-script loading logic
+* `fs.jsm` - implements filesystem-related functions - `boot.sys.mjs` uses this file internally.
+* `utils.sys.mjs` - implements various functions used by `utils.sys.mjs` and which your scripts can also use
 
 ## Deleting startup-cache
 
 Firefox caches some files to speed-up startup. But the files in utils/ modify the startup behavior so you might be required to clear the startup-cache.
 
-If you modify boot.jsm and happen to break it, you will likely need to clear startup-cache again.
+If you modify boot.sys.mjs and happen to break it, you will likely need to clear startup-cache again.
 
 <details>
 <summary>Clear startup-cache via about:support (recommended)</summary>
@@ -89,21 +94,29 @@ The startup-cache folder can be found as follows:
 
 # Usage
 
-The file extension for your custom scripts must be `.uc.js` or `.sys.mjs` (for backgroundmodule only), the loader script only looks for files with those extensions.
+The loader module `boot.sys.mjs` looks for three kinds of files in your scripts directory ("JS" by default - can be changed in `chrome.manifest`):
+
+* `<filename>.uc.js` - classic script which will be synchronously injected into target documents.
+* `<filename>.uc.mjs` (new in 0.8) - script which will be loaded into target documents asynchronously as ES6 module.
+* `<filename>.sys.mjs` - module script which will be loaded into global context synchronously once on startup
+
+Additionally (".uc.js") scripts can be marked as background-module by tagging them with `@backgroundmodule` in the script header.
 
 Just put any such files into the `JS` directory. The `JS` directory should be in the same directory where userChrome.css would be. If you wish to change the directory name then you need to modify the `chrome.manifest` file inside `utils` directory. For example change `../JS/` to `../scripts/` to make Firefox load scripts from "scripts" folder.
 
 At runtime, individual scripts can be toggled on/off from menubar -> tools -> userScripts. Note that toggling requires Firefox to be restarted, for which a "restart now" -button is provided. The button clears startup-cache so you don't need to worry about that.
 
+For window scoped scripts (classic `.uc.js` and `.uc.mjs`) it the toggling should take effect when a new window is opened. Any effects in the old window will persist though.
+
 A global preference to toggle all scripts is `userChromeJS.enabled`. This will disable all scripts but leaves the restart-button in the custom menu available.
 
 # API
 
-This manager is NOT entirely compatible with all existing userScripts - specifically scripts that expect a global `_uc` object or something similar to be available. This manager does export a `_ucUtils` object to window objects though.
+This manager is NOT entirely compatible with all existing userScripts - specifically scripts that expect a global `_uc` object or something similar to be available. This manager does export a `_ucUtils` object to window objects which is described in [Utils section]("#Utils").
 
-# Script scope
+## Script scope
 
-Each script normally runs once *per document* when the document is loaded. A window is a document, but a window may contain several "sub-documents" - kind of like iframes on web pages.
+Each script normally runs once *per document* when the document is loaded. A window is a document, but a window may contain several "sub-documents" - kind of like iframes on web pages, an example of this is the sidebar.
 
 ## @include & @exclude
 
@@ -124,7 +137,7 @@ The above would be executed only in the Library window.
 // ==/UserScript==
 ```
 
-This would execute in both library and main window. "main" is an alias for `chrome://browser/content/browser.xhtml`.
+This would execute in both library and main window. `main` is an alias for `chrome://browser/content/browser.xhtml` in Firefox and `chrome://messenger/content/messenger.xhtml` in Thunderbird
 
 A wildcard `*` can be used to target any window.
 
@@ -137,7 +150,7 @@ A wildcard `*` can be used to target any window.
 
 This would execute in all documents, excecpt main window - notice "main" is excluded this time.
 
-In addition, scripts can be marked as `@backgroundmodule` in which case they are executed "outside" of any document when the the loader reads the file. See **backgroundmodule** section below.
+In addition, scripts can be marked as `@backgroundmodule` in which case they are executed "outside" of any document when the the loader reads the file. See [backgroundmodule](#backgroundmodule) section below.
 
 Some convenience functions are provided for scripts to use in global `_ucUtils` object available in windows.
 
@@ -160,7 +173,7 @@ let EXPORTED_SYMBOLS = [];
 
 Alternatively, you can name your script with `.sys.mjs` file extension in which case the loader automatically treats it as backgroundmodule.
 
-Note that the `EXPORTED_SYMBOLS` array like above in module global scope is mandatory in `.uc.js` scripts.
+Note that the `EXPORTED_SYMBOLS` array like above in module global scope is mandatory in `.uc.js` scripts when they are loaded as backgroundmodule.
 
 ### ES6 modules
 
@@ -179,7 +192,15 @@ Some.doThing();
 
 The manager loads any `.sys.mjs` files always as backgroundmodule - in addition they are loaded as ES6 modules which means you can use static `import` and `export` declarations inside them.
 
-You should note that background modules do not have access to window objects when they are being run because they are executed before any window exists. Thus, they also do not get access to `_ucUtils` object.
+You should note that background modules do not have access to window objects when they are being run because they are executed before any window exists. Thus, they also do not automaticalle get access to `_ucUtils` object.
+
+As of version `0.8` ES6 module scripts, including backgroundmodules (so `.sys.mjs` and `.uc.mjs` files) can import `_ucUtils` like this:
+
+```js
+import { _ucUtils } from "chrome://userchromejs/content/utils.sys.mjs";
+```
+
+Although window scoped module scripts (.uc.mjs) automatically gain access to it anyway from the window object.
 
 ## @description
 
@@ -263,6 +284,8 @@ By default the script is executed once per document it applies to, but this can 
 console.log("Hello world!") // This is only run in the first window that opens.
 
 ```
+
+# Utils
 
 ## General
 
