@@ -199,8 +199,23 @@ As of version `0.8` ES6 module scripts, including backgroundmodules (so `.sys.mj
 ```js
 import { _ucUtils } from "chrome://userchromejs/content/utils.sys.mjs";
 ```
-
 Although window scoped module scripts (.uc.mjs) automatically gain access to it anyway from the window object.
+
+### import heads-up
+
+**Note for .uc.mjs scripts!**
+Because your script is running in its own module scope within a window the module imported with an `import` statement above is NOT the same instance of the object as what you would get automatically via `_ucUtils`. The methods within are the same, but since it is a different object it's internal properties have not been initialized by `boot.sys.mjs` so some functionality is missing.
+
+You can instead use ChromeUtils to import the same object from the global object:
+
+```js
+const { _ucUtils } = ChromeUtils.importESModule("chrome://userchromejs/content/utils.sys.mjs")
+```
+
+Or indeed just use `_ucUtils` from the window object.
+
+The same behavior applies to all modules imported from .uc.mjs module scopes via `import` statements.
+
 
 ## @description
 
