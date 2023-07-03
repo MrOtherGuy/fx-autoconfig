@@ -387,7 +387,7 @@ Above line is also left empty
     "prefChangedToTrue",
     () => {
       return new Promise((resolve, reject) => {
-        PREF_LISTENER.listenOnce((val,pref) => resolve(`${pref},${val}`));
+        PREF_LISTENER.listenOnce((val,pref) => resolve(`${pref},${val.value}`));
         Test.resolveOnTimeout(2000).then(reject);
       })
     }

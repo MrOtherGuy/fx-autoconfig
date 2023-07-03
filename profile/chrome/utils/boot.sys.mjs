@@ -1,6 +1,6 @@
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 import { FileSystem as FS } from "chrome://userchromejs/content/fs.sys.mjs";
-import { _ucUtils as utils, ScriptInfo, loaderModuleLink } from "chrome://userchromejs/content/utils.sys.mjs";
+import { _ucUtils as utils, ScriptInfo, loaderModuleLink, Pref } from "chrome://userchromejs/content/utils.sys.mjs";
 
 const FX_AUTOCONFIG_VERSION = "0.8";
 console.warn( "Browser is executing custom scripts via autoconfig" );
@@ -194,16 +194,10 @@ class ScriptData {
   }
 }
 
-if (!Services.prefs.prefHasUserValue(PREF_ENABLED)) {
-  Services.prefs.setBoolPref(PREF_ENABLED, true);
-}
-
-if (!Services.prefs.prefHasUserValue(PREF_SCRIPTSDISABLED)) {
-  Services.prefs.setCharPref(PREF_SCRIPTSDISABLED, "");
-}
-
-if (!Services.prefs.prefHasUserValue(PREF_GBROWSERHACKENABLED)) {
-  Services.prefs.setBoolPref(PREF_GBROWSERHACKENABLED, false);
+{
+  Pref.fromName(PREF_ENABLED).withDefault(true);
+  Pref.fromName(PREF_SCRIPTSDISABLED).withDefault("");
+  Pref.fromName(PREF_GBROWSERHACKENABLED).withDefault(false);
 }
 
 function showgBrowserNotification(){
@@ -447,8 +441,9 @@ const _ucjs = !Services.appinfo.inSafeMode && new UserChrome_js();
 _ucjs && utils.startupFinished().then(() => {
   _ucjs.SESSION_RESTORED = true;
   _ucjs.GBROWSERHACK_ENABLED === 2 && showgBrowserNotification();
-  if(!Services.prefs.getBoolPref("userChromeJS.firstRunShown")){
-    Services.prefs.setBoolPref("userChromeJS.firstRunShown",true);
+  let pref = Pref.fromName("userChromeJS.firstRunShown");
+  if(!pref.value){
+    pref.setTo(true);
     utils.showNotification({
       type: "fx-autoconfig-installed",
       label: `fx-autoconfig: ${utils.brandName} is being modified with custom autoconfig scripting`

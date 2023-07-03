@@ -1,43 +1,112 @@
 import { FileSystem as FS } from "chrome://userchromejs/content/fs.sys.mjs";
 
-const yPref = {
-  get: function (prefPath) {
-    const sPrefs = Services.prefs;
-    try {
-      switch (sPrefs.getPrefType(prefPath)) {
-        case 0:
-          return undefined;
-        case 32:
-          return sPrefs.getStringPref(prefPath);
-        case 64:
-          return sPrefs.getIntPref(prefPath);
-        case 128:
-          return sPrefs.getBoolPref(prefPath);
+export class Pref{
+  #type;
+  #value;
+  #name;
+  constructor(symbol,pref,type,value){
+    if(symbol !== Pref.#symbol){
+      throw new Error("invlid constuctor")
+    }
+    this.#name = pref;
+    this.#type = type;
+    this.#value = null;
+  }
+  get name(){
+    return this.#name
+  }
+  get value(){
+    if(this.#value === null){
+      this.refresh();
+    }
+    return this.#value
+  }
+  refresh(){
+    this.#value = Pref.getPrefFromType(this.#name,this.#type)
+  }
+  exists(){
+    return this.#type > 0;
+  }
+  withDefault(value){
+    if(this.#type > 0){
+      return true
+    }
+    this.setTo(value);
+    return false
+  }
+  hasUserValue(){
+    return this.#type > 0 && Services.prefs.prefHasUserValue(this.#name)
+  }
+  get type(){
+    if(this.#type === 32)
+      return "string"
+    if(this.#type === 64)
+      return "number"
+    if(this.#type === 128)
+      return "boolean"
+    return "invalid"
+  }
+  setTo(some){
+    const someType = typeof some;
+    if(someType === this.type){
+      if(this.#type === 64){
+        some = Math.floor(some)
       }
-    } catch (ex) {
-      return undefined;
+      Pref.setPrefByType(this.#name,this.#type,some);
+      this.#value = Math.floor(some);
+      return true
     }
-    return;
-  },
-  set: function (prefPath, value) {
-    const sPrefs = Services.prefs;
-    switch (typeof value) {
-      case 'string':
-        return sPrefs.setCharPref(prefPath, value) || value;
-      case 'number':
-        return sPrefs.setIntPref(prefPath, value) || value;
-      case 'boolean':
-        return sPrefs.setBoolPref(prefPath, value) || value;
+    if(this.#type === 0){
+      const type = someType === "string"
+        ? 32
+        : someType === "number"
+          ? 64
+          : 128;
+      if(type === 64){
+        some = Math.floor(some)
+      }
+      Pref.setPrefByType(this.#name,type,some);
+      this.#type = type;
+      this.#value = some;
+      return true
     }
-    return;
-  },
-  addListener:(a,b) => {
-    let o = (q,w,e)=>(b(yPref.get(e),e));
-    Services.prefs.addObserver(a,o);
-    return{pref:a,observer:o}
-  },
-  removeListener:(a)=>( Services.prefs.removeObserver(a.pref,a.observer) )
-};
+    throw new Error("Can't set pref to a different type")
+  }
+  reset(){
+    if(this.#type !== 0){
+      Services.prefs.clearUserPref(this.#name)
+    }
+    this.#value = null;
+    this.#type = 0;
+  }
+  orDefault(some){
+    return this.#type > 0
+      ? this.value
+      : some
+  }
+  static setPrefByType(pref,type,value){
+    if(type === 32)
+      return Services.prefs.setCharPref(pref,value);
+    if(type === 64)
+      return Services.prefs.setIntPref(pref,value);
+    if(type === 128)
+      return Services.prefs.setBoolPref(pref,value);
+    throw new Error(`Unknown pref type: {type}`);
+  }
+  static getPrefFromType(pref,type){
+    if(type === 32)
+      return Services.prefs.getStringPref(pref)
+    if(type === 64)
+      return Services.prefs.getIntPref(pref)
+    if(type === 128)
+      return Services.prefs.getBoolPref(pref);
+    return undefined;
+  }
+  static #symbol = Symbol("PrefConstructor");
+  static fromName(some){
+    return new this(this.#symbol,some,Services.prefs.getPrefType(some))
+  }
+}
 
 function updateStyleSheet(name,type) {
   if(type){
@@ -219,7 +288,7 @@ export class _ucUtils{
       let script = _ucScripts.find(s => s.filename === aFilter);
       return script ? script.getInfo() : null;
     }
-    const disabledScripts = (yPref.get('userChromeJS.scriptsDisabled') || '').split(",");
+    const disabledScripts = Pref.fromName('userChromeJS.scriptsDisabled').orDefault('').split(",");
     if(filterType === "function"){
       return _ucScripts.filter(aFilter).map(
         (script) => script.getInfo(!disabledScripts.includes(script.filename))
@@ -264,8 +333,15 @@ export class _ucUtils{
   static parseStringAsScriptInfo(aName, aString){
     return ScriptInfo.fromString(aName, FS.StringContent({content: aString}))
   }
-  static get prefs(){
-    return yPref
+  static prefs = {
+    get: (prefPath) => Pref.fromName(prefPath),
+    set: (prefName, value) => Pref.fromName(prefName).setTo(value),
+    addListener:(a,b) => {
+      let o = (q,w,e)=>(b(Pref.fromName(e),e));
+      Services.prefs.addObserver(a,o);
+      return{pref:a,observer:o}
+    },
+    removeListener:(a)=>( Services.prefs.removeObserver(a.pref,a.observer) )
   }
   static registerHotkey(desc,func){
     const validMods = ["accel","alt","ctrl","meta","shift"];
