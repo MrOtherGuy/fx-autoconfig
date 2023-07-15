@@ -496,6 +496,7 @@ Above line is also left empty
    */
    
    // This test should resolve after timeout because pref listener was removed
+   // Note: this test will fail if pref "userChromeJS.firstRunShown" isn't set on startup
   new Test(
     "prefNotChangedToFalse",
     () => {

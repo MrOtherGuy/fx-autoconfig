@@ -1,38 +1,37 @@
 import { FileSystem as FS } from "chrome://userchromejs/content/fs.sys.mjs";
 
-export class Pref{
+
+class YPref{
   #type;
-  #value;
   #name;
-  constructor(symbol,pref,type,value){
-    if(symbol !== Pref.#symbol){
-      throw new Error("invlid constuctor")
-    }
+  #observerCallbacks;
+  constructor(pref,type,value){
     this.#name = pref;
     this.#type = type;
-    this.#value = null;
+  }
+  exists(){
+    return this.#type > 0;
   }
   get name(){
     return this.#name
   }
   get value(){
-    if(this.#value === null){
-      this.refresh();
+    try{
+      return YPref.getPrefOfType(this.#name,this.#type)
+    }catch(ex){
+      this.#type = 0
     }
-    return this.#value
+    return null
   }
-  refresh(){
-    this.#value = Pref.getPrefFromType(this.#name,this.#type)
+  set value(some){
+    this.setTo(some);
   }
-  exists(){
-    return this.#type > 0;
-  }
-  withDefault(value){
+  defaultTo(value){
     if(this.#type > 0){
-      return true
+      return false
     }
     this.setTo(value);
-    return false
+    return true
   }
   hasUserValue(){
     return this.#type > 0 && Services.prefs.prefHasUserValue(this.#name)
@@ -47,14 +46,10 @@ export class Pref{
     return "invalid"
   }
   setTo(some){
-    const someType = typeof some;
-    if(someType === this.type){
-      if(this.#type === 64){
-        some = Math.floor(some)
-      }
-      Pref.setPrefByType(this.#name,this.#type,some);
-      this.#value = Math.floor(some);
-      return true
+    const someType = YPref.getTypeof(some);
+    if(someType > 0 && someType === this.#type){
+      YPref.setPrefOfType(this.#name,this.#type,some);
+      return
     }
     if(this.#type === 0){
       const type = someType === "string"
@@ -62,13 +57,8 @@ export class Pref{
         : someType === "number"
           ? 64
           : 128;
-      if(type === 64){
-        some = Math.floor(some)
-      }
-      Pref.setPrefByType(this.#name,type,some);
-      this.#type = type;
-      this.#value = some;
-      return true
+      YPref.setPrefOfType(this.#name,type,some);
+      return
     }
     throw new Error("Can't set pref to a different type")
   }
@@ -76,15 +66,83 @@ export class Pref{
     if(this.#type !== 0){
       Services.prefs.clearUserPref(this.#name)
     }
-    this.#value = null;
-    this.#type = 0;
+    this.#type = Services.prefs.getPrefType(this.#name);
   }
-  orDefault(some){
+  orFallback(some){
     return this.#type > 0
       ? this.value
       : some
   }
-  static setPrefByType(pref,type,value){
+  observe(_, topic, data) {
+    if(topic !== "nsPref:changed"){
+      console.warn("Somehow pref observer got topic:",topic);
+      return
+    }
+    const newType = Services.prefs.getPrefType(this.#name);
+    const needsTypeRefresh = this.#type > 0 && this.#type != newType;
+    if(needsTypeRefresh){
+      Services.prefs.removeObserver(this.#name,this);
+    }
+    this.#type = newType;
+    for(let cb of this.#getObserverCallbacks()){
+      try{
+        cb(this)
+      }catch(ex){
+        console.error(ex)
+      }
+    }
+    if(needsTypeRefresh){
+      this.#observerCallbacks?.clear();
+    }
+  }
+  forget(){
+    Services.prefs.removeObserver(this.#name,this);
+    this.#observerCallbacks?.clear();
+  }
+  #getObserverCallbacks(){
+    if(!this.#observerCallbacks){
+      this.#observerCallbacks = new Set();
+    }
+    return this.#observerCallbacks
+  }
+  addListener(callback){
+    let callbacks = this.#getObserverCallbacks();
+    if(callbacks.size === 0){
+      Services.prefs.addObserver(this.#name,this);
+    }
+    callbacks.add(callback);
+    return this
+  }
+  removeListener(callback){
+    let callbacks = this.#getObserverCallbacks();
+    callbacks.delete(callback);
+    if(callbacks.size === 0){
+      Services.prefs.removeObserver(this.#name,this)
+    }
+  }
+  static fromName(some){
+    return new this(some,Services.prefs.getPrefType(some))
+  }
+  static getPrefOfType(pref,type){
+    if(type === 32)
+      return Services.prefs.getStringPref(pref)
+    if(type === 64)
+      return Services.prefs.getIntPref(pref)
+    if(type === 128)
+      return Services.prefs.getBoolPref(pref);
+    return null;
+  }
+  static getTypeof(some){
+    const someType = typeof some;
+    if(someType === "string")
+      return 32
+    if(someType === "number")
+      return 64
+    if(someType === "boolean")
+      return 128
+    return 0
+  }
+  static setPrefOfType(pref,type,value){
     if(type === 32)
       return Services.prefs.setCharPref(pref,value);
     if(type === 64)
@@ -93,20 +151,11 @@ export class Pref{
       return Services.prefs.setBoolPref(pref,value);
     throw new Error(`Unknown pref type: {type}`);
   }
-  static getPrefFromType(pref,type){
-    if(type === 32)
-      return Services.prefs.getStringPref(pref)
-    if(type === 64)
-      return Services.prefs.getIntPref(pref)
-    if(type === 128)
-      return Services.prefs.getBoolPref(pref);
-    return undefined;
-  }
-  static #symbol = Symbol("PrefConstructor");
-  static fromName(some){
-    return new this(this.#symbol,some,Services.prefs.getPrefType(some))
-  }
 }
+export function Pref(name){
+  return YPref.fromName(name)
+}
+
 
 function updateStyleSheet(name,type) {
   if(type){
@@ -288,7 +337,7 @@ export class _ucUtils{
       let script = _ucScripts.find(s => s.filename === aFilter);
       return script ? script.getInfo() : null;
     }
-    const disabledScripts = Pref.fromName('userChromeJS.scriptsDisabled').orDefault('').split(",");
+    const disabledScripts = YPref.fromName('userChromeJS.scriptsDisabled').orFallback('').split(",");
     if(filterType === "function"){
       return _ucScripts.filter(aFilter).map(
         (script) => script.getInfo(!disabledScripts.includes(script.filename))
@@ -334,10 +383,10 @@ export class _ucUtils{
     return ScriptInfo.fromString(aName, FS.StringContent({content: aString}))
   }
   static prefs = {
-    get: (prefPath) => Pref.fromName(prefPath),
-    set: (prefName, value) => Pref.fromName(prefName).setTo(value),
+    get: (prefPath) => YPref.fromName(prefPath),
+    set: (prefName, value) => YPref.fromName(prefName).setTo(value),
     addListener:(a,b) => {
-      let o = (q,w,e)=>(b(Pref.fromName(e),e));
+      let o = (q,w,e)=>(b(YPref.fromName(e),e));
       Services.prefs.addObserver(a,o);
       return{pref:a,observer:o}
     },
