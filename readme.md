@@ -204,7 +204,7 @@ Although window scoped module scripts (.uc.mjs) automatically gain access to it 
 ### import heads-up
 
 **Note for .uc.mjs scripts!**
-Because your script is running in its own module scope within a window the module imported with an `import` statement above is NOT the same instance of the object as what you would get automatically via `_ucUtils`. The methods within are the same, but since it is a different object it's internal properties have not been initialized by `boot.sys.mjs` so some functionality is missing.
+Because your script is running in its own module scope within a window the module imported with an `import` statement above is NOT the same instance of the object as what you would get automatically via `_ucUtils`. The methods within are the same, but since it is a different object its internal properties have not been initialized by `boot.sys.mjs` so some functionality is missing - such as access to custom script info via `.getScriptData()`
 
 You can instead use ChromeUtils to import the same object from the global object:
 
@@ -381,14 +381,14 @@ The created hotkey will override built-in hotkeys.
 The id field in the details object should have some unique value, but this is not enforced.
 
 
-### \_ucUtils.getScriptdata(aFilter) -> Array | ScriptInfo
+### \_ucUtils.getScriptData(aFilter) -> Array | ScriptInfo
 
 Returns `ScriptInfo` object(s) with a **copy** of their metadata. This includes scripts that are not yet running or which are disabled by pref.
 
 When called without arguments returns an array of `ScriptInfo` objects describing your scripts.
 
 ```js
-let scripts = _ucUtils.getScriptdata(); 
+let scripts = _ucUtils.getScriptData(); 
 for(let script of scripts){
   console.log(`${script.filename} - @{script.isEnabled} - ${script.isRunning}`)
 }
@@ -397,16 +397,16 @@ for(let script of scripts){
 If the first argument is a `string` then this returns **a single** `ScriptInfo` object for a script that had the specified filename. If such script is not found then `null` is returned.
 
 ```js
-let script = _ucUtils.getScriptdata("my-script.uc.js");
+let script = _ucUtils.getScriptData("my-script.uc.js");
 console.log(`@{script.name} - ${script.isRunning}`);
 ```
 
 If the first argument is a function, then this function returns a filtered list of scripts that return `true` when the function is run on them:
 
 ```js
-let scripts = _ucUtils.getScriptdata(s => s.isRunning);
+let scripts = _ucUtils.getScriptData(s => s.isRunning);
 console.log(`You have ${scripts.length} running scripts);
-// This is essentially the same as _ucUtils.getScriptdata().filter(s => s.isRunning)
+// This is essentially the same as _ucUtils.getScriptData().filter(s => s.isRunning)
 ```
 
 **Note!** If the first argument is anything other than a function or a string, then `getScriptData()` will throw an error.
