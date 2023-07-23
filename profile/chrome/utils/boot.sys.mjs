@@ -373,7 +373,7 @@ class UserChrome_js{
     if(Services.prefs.getBoolPref(PREF_ENABLED)){
       const disabledScripts = getDisabledScripts();
       for(let script of this.scripts){
-        if(script.inbackground){
+        if(script.inbackground || script.injectionFailed){
           continue
         }
         if(!disabledScripts.includes(script.filename)){
