@@ -336,7 +336,7 @@ export class _ucUtils{
       let script = _ucScripts.find(s => s.filename === aFilter);
       return script ? script.getInfo() : null;
     }
-    const disabledScripts = YPref.fromName('userChromeJS.scriptsDisabled').orFallback('').split(",");
+    const disabledScripts = Services.prefs.getStringPref('userChromeJS.scriptsDisabled',"").split(",");
     if(filterType === "function"){
       return _ucScripts.filter(aFilter).map(
         (script) => script.getInfo(!disabledScripts.includes(script.filename))
