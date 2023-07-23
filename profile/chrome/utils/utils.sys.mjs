@@ -1,6 +1,5 @@
 import { FileSystem as FS } from "chrome://userchromejs/content/fs.sys.mjs";
 
-
 class YPref{
   #type;
   #name;
@@ -228,9 +227,9 @@ export const loaderModuleLink = new (function(){
     this.brandName = aBrandName;
     this.variant = aVariant;
     this.scriptDataConstructor = aScriptData;
-    delete this.setModuleInfo;
+    delete this.setup;
     Object.freeze(this);
-    return null
+    return
   }
   this.setSessionRestored = () => { sessionRestored = true };
   this.sessionRestored = () => sessionRestored;
