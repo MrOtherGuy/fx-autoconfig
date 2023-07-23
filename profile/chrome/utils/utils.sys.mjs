@@ -46,18 +46,8 @@ class YPref{
   }
   setTo(some){
     const someType = YPref.getTypeof(some);
-    if(someType > 0 && someType === this.#type){
-      YPref.setPrefOfType(this.#name,this.#type,some);
-      return
-    }
-    if(this.#type === 0){
-      const type = someType === "string"
-        ? 32
-        : someType === "number"
-          ? 64
-          : 128;
-      YPref.setPrefOfType(this.#name,type,some);
-      return
+    if(someType > 0 && someType === this.#type || this.#type === 0){
+      return YPref.setPrefOfType(this.#name,someType,some);
     }
     throw new Error("Can't set pref to a different type")
   }
