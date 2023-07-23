@@ -560,18 +560,38 @@ If the specified stylesheet imports other files, then calling this will also rel
 
 A shortcut for reading and writing preferences
 
-### \_ucUtils.prefs.set(prefName,value) -> value
+### \_ucUtils.prefs.set(prefName,value) -> undefined
 
 ```js
 _ucUtils.prefs.set("some.pref.path","test");
 _ucUtils.prefs.set("some.other.pref",300);
 ```
 
-Returns a new value on success, undefined if pref couldn't be set
+This will `throw` if you try to set a pref to a value of different type than what it currently is (ie. boolean vs. string) unless the pref doesn't exist when this is called.
+This will also throw if you try to set the pref with value that is not one of `number, string, boolean` - number is also converted to integer.
 
-### \_ucUtils.prefs.get(prefName) -> value
+### \_ucUtils.prefs.get(prefName) -> Pref
 
-Returns the value of the pref, undefined if it doesn't exist
+Returns a representation of the pref wrapped into an object with properties:
+
+```js
+let myPref = _ucUtils.prefs.get("userChrome.scripts.disabled");
+/*
+* {
+*   exists() // true|false indicating if this pref exists
+*   name     // string - the called pref name
+*   value    // <number|string|boolean> | `null` - null means pref with this name could not be read
+* set value() // same as _ucUtils.prefs.set(name,value)
+*   hasUserValue() // true|false indicating if this has user set value
+*   type     // "string"|"boolean"|"number"|"invalid"
+*   reset()  // resets this pref to its default value
+* }
+*/
+
+myPref.exists()
+// false - "userChrome.scripts.disabled" does not exist
+```
+
 
 ### \_ucUtils.prefs.addListener(prefName,callback) -> Object
 
@@ -580,12 +600,18 @@ let callback = (value,pref) => (console.log(`${pref} changed to ${value}`))
 let prefListener = _ucUtils.prefs.addListener("userChromeJS",callback);
 ```
 
-Note that the callback will be invoked when any pref that starts with `userChromeJS` is changed. The pref in callback argument will be the actual pref whose value changed.
+Note that the callback will be invoked when any pref that starts with `userChromeJS` is changed. The pref in callback argument will be a `Pref` object wrapping the value of the actual pref whose value was changed.
 
 ### \_ucUtils.prefs.removeListener(listener)
 
 ```
 _ucUtils.prefs.removeListener(prefListener) // from above example
+```
+
+Pref class can also be imported directly to module scripts like this:
+
+```js
+import { Pref } from "chrome://userchromejs/content/utils.sys.mjs";
 ```
 
 ## Filesystem general
@@ -747,126 +773,6 @@ let uri = _ucUtils.chromeDir.fileURI // a file:/// uri
 
 for (let file of fsResult){ // equal to fsResult.entries()
   console.log(file.leafName);
-}
-```
-
-## Filesystem methods (deprecated, don't use)
-
-**Attention!** Don't use these anymore. First versioned build `"0.7"` introduced a new `_ucUtils.fs` API that you should use instead. These old methods will be removed in `"0.8"` which will be released with Firefox ESR 115
-
-### \_ucUtils.getFSEntry(fileName) -> nsIFile || enumerator for entries in a folder
-
-Get file handle for resources/some.txt:
-
-```js
-let fileHandle = _ucUtils.getFSEntry("some.txt");
-```
-
-Loop through filesystem entries in resources/path:
-
-```js
-let contents = _ucUtils.getFSEntry("path");
-while(contents.hasMoreElements()){
-  let nextFile = contents.getNext().QueryInterface(Ci.nsIFile);
-  console.log(nextFile.leafName);
-}
-```
-
-By default `getFSEntry()` returns an enumerator over files when the argument matches a folder. If you want to return an nsIFile object describing the folder itself then supply optional argument disabling automatic enumeration.
-
-```js
-let directory = _ucUtils.getFSEntry("path", false);
-console.log(directory.leafName)
-```
-
-### \_ucUtils.readFile(\<nsIFile or string\>,metaOnly) -> String
-
-```js
-_ucUtils.readFile(aFile,false)
-```
-
-```js
-let content = _ucUtils.readFile("test.txt")
-
->> console.log(content)
-<< "some file content"
-```
-
-Attempts to read the content of the given fileHandle as text. Boolean metaOnly is used to parse only the metadata of userScripts when reading them from script directory.
-
-When first argument is a string, the filename is parsed as being relative to the **resources** directory.
-
-### \_ucUtils.readFileAsync(fileName) -> Promise \<filecontent\>
-
-```js
-
-// read from resources directory
-
-_ucUtils.readFileAsync("test.txt")
-.then(content => console.log(content))
-
-<< "some file content"
-
-// read from parent directory of resources:
-
-_ucUtils.readFileAsync("../userChrome.css")
-.then(content => console.log(content))
-
-<< "#nav-bar{ background: #f00 !important }"
-```
-
-Asynchronous file reading. Filename must be a string corresponding to a file relative to **resources** directory. Promise is rejected if file isn't found.
-
-### \_ucUtils.readJSON(fileName) -> Promise \<Object\>
-
-```js
-_ucUtils.readJSON("some.json")
-.then(some => console.log(some))
-
-<< Object { test: "Hello world!", value: 42 }
-```
-
-A wrapper for `_ucUtils.readFileAsync` which tries to parse the file contents as JSON.
-
-### \_ucUtils.writeFile( fileName, content, \[options\] ) -> Promise \<Number\>
-
-```js
-let some_content = "Hello world!\n";
-let bytes = await _ucUtils.writeFile( "hello.txt", some_content );
-console.log(bytes);
-
-<< 13
-```
-
-Write the content into file **as UTF8**. On successful write the promise is resolved with number of written bytes.
-
-By default writing files using this API is only allowed in **resources** directory. Calling `writeFile` with fileName like "../test.txt" will then reject the promise. You must set pref `userChromeJS.allowUnsafeWrites` to `true` to allow writing outside of resources.
-
-**Note!** Currently this method **replaces** the existing file if one exists.
-
-The optional `options` argument is currently only used to pass a filename for temp file. By default it is derived from fileName. 
-
-### \_ucUtils.createFileURI(fileName) -> String
-
-```js
-_ucUtils.createFileURI("path\some.png")
-```
-
-Return a valid file uri describing `<profileDir>\chrome\resources\path\some.png`
-
-### \_ucUtils.chromeDir
-
-Returns an object with two properties
-
-```js
-_ucUtils.chromeDir.uri // a file:/// uri
-
-_ucUtils.chromeDir.files -> enumerator for entries in chrome folder
-
-let entries = _ucUtils.chromeDir.files;
-while(entries.hasMoreElements()){
-  let nextFile = entries.getNext().QueryInterface(Ci.nsIFile);
-  console.log(nextFile.leafName);
 }
 ```
 
