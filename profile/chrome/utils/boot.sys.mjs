@@ -33,7 +33,8 @@ function getDisabledScripts(){
 
 class ScriptData {
   #preCompiledESM;
-  #preCompileStarted;
+  #preCompileFailed;
+  #preCompiling;
   constructor(leafName, headerText, noExec){
     const hasLongDescription = (/^\/\/\ @long-description/im).test(headerText);
     this.filename = leafName;
@@ -57,6 +58,7 @@ class ScriptData {
     this.inbackground = this.filename.endsWith(".sys.mjs") || /\/\/ @backgroundmodule\b/.test(headerText);
     this.ignoreCache = /\/\/ @ignorecache\b/.test(headerText);
     this.isRunning = false;
+    this.injectionFailed = false;
     this.manifest = headerText.match(/\/\/ @manifest\s+(.+)\s*$/im)?.[1];
     this.noExec = noExec;
     // Construct regular expression to use to match target document
@@ -89,39 +91,37 @@ class ScriptData {
     return getDisabledScripts().indexOf(this.filename) === -1;
   }
   preCompileMJS(){
-    // Note: #preCompiledESM can be "undefined" at this point if compilation failed
-    if(this.#preCompiledESM || this.#preCompileStarted){
+    if(this.#preCompiledESM){
       return Promise.resolve(this.#preCompiledESM)
     }
-    this.#preCompileStarted = true;
-    return new Promise((resolve,reject) => {
+    if(this.#preCompileFailed){
+      return Promise.resolve(null);
+    }
+    if(this.#preCompiling){
+      return this.#preCompiling
+    }
+    this.#preCompiling = new Promise( resolve => {
       ChromeUtils.compileScript(`data:,"use strict";import("chrome://userscripts/content/${this.filename}").catch(console.error)`)
       .then( script => {
         this.#preCompiledESM = script;
         resolve(script);
       })
-      .catch(reject)
-    })
+      .catch( (ex) => resolve(ScriptData.onCompileRejection(ex,this.filename)) )
+      .finally(()=>{this.#preCompiling = null})
+    });
+    return this.#preCompiling
   }
-  getPreCompiledESM(){
-    // This branch needs to exist because the script might have been disabled during startup, but it was enabled later and thus needs to be compiled first before it can run in new windowGlobal
-    if(!this.#preCompileStarted){
-      return new Promise((resolve,reject) => {
-        this.preCompileMJS()
-        .then( resolve )
-        .catch( ex => reject(new Error(`@ ${this.filename}: script couldn't be compiled because:`,{cause: ex}) ))
-      })
-    }
-    return this.#preCompiledESM
-      ? Promise.resolve(this.#preCompiledESM)
-      : Promise.reject(new Error(`@ ${this.filename}: script is not compiled yet`))
+  static onCompileRejection(ex,script){
+    script.#preCompileFailed = true;
+    console.error(`@ ${script.filename}: script couldn't be compiled because:`,ex);
+    return null
   }
   tryLoadIntoWindow(win){
     if (this.inbackground || this.noExec || !this.regex.test(win.location.href)) {
       return
     }
     if(this.onlyonce && this.isRunning) {
-      if (this.startup) {
+      if(this.startup){
         SHARED_GLOBAL[this.startup]._startup(win)
       }
       return
@@ -134,17 +134,21 @@ class ScriptData {
       console.error(new Error(`@ ${this.filename}:${ex.lineNumber}`,{cause:ex}));
     })
   }
-  static markScriptRunning(aScript){
+  static markScriptRunning(aScript,aGlobal){
     aScript.isRunning = true;
-    aScript.startup && SHARED_GLOBAL[aScript.startup]._startup(win)
+    aScript.startup && SHARED_GLOBAL[aScript.startup]._startup(aGlobal);
+    return
   }
   static injectESMIntoGlobal(aScript,aGlobal){
     return new Promise((resolve,reject) => {
-      aScript.getPreCompiledESM()
-      .then(script => script.executeInGlobal(aGlobal))
-      .then(script => ScriptData.markScriptRunning(aScript))
+      aScript.preCompileMJS()
+      .then(script => script && script.executeInGlobal(aGlobal))
+      .then(() => ScriptData.markScriptRunning(aScript,aGlobal))
       .then(resolve)
-      .catch(reject)
+      .catch( ex => {
+        aScript.injectionFailed = true;
+        reject(ex)
+      })
     })
   }
   static injectClassicScriptIntoGlobal(aScript,aGlobal){
@@ -156,10 +160,11 @@ class ScriptData {
           ignoreCache: aScript.ignoreCache
         }
       )
-      ScriptData.markScriptRunning(aScript)
+      ScriptData.markScriptRunning(aScript,aGlobal)
       return Promise.resolve(1)
     }catch(ex){
-      ScriptData.markScriptRunning(aScript)
+      aScript.injectionFailed = true;
+      ScriptData.markScriptRunning(aScript,aGlobal)
       return Promise.reject(ex)
     }
   }
