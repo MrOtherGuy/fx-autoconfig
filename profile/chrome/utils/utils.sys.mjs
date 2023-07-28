@@ -1,6 +1,6 @@
 import { FileSystem as FS } from "chrome://userchromejs/content/fs.sys.mjs";
 
-class YPref{
+export class YPref{
   #type;
   #name;
   #observerCallbacks;
@@ -139,6 +139,13 @@ class YPref{
     if(type === 128)
       return Services.prefs.setBoolPref(pref,value);
     throw new Error(`Unknown pref type: {type}`);
+  }
+  static setIfUnset(pref,value){
+    if(!Services.prefs.prefHasUserValue(pref)){
+      this.setPrefOfType(pref,this.getTypeof(value),value);
+      return true
+    }
+    return false
   }
 }
 export function Pref(name){
@@ -374,6 +381,7 @@ export class _ucUtils{
   static prefs = {
     get: (prefPath) => YPref.fromName(prefPath),
     set: (prefName, value) => YPref.fromName(prefName).setTo(value),
+    setIfUnset: (prefName,value) => YPref.setIfUnset(prefName,value),
     addListener:(a,b) => {
       let o = (q,w,e)=>(b(YPref.fromName(e),e));
       Services.prefs.addObserver(a,o);
