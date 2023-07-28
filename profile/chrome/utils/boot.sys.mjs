@@ -305,7 +305,7 @@ class UserChrome_js{
     const disabledScripts = getDisabledScripts();
     // load script data
     for(let entry of FS.getEntry('',{baseDirectory: FS.SCRIPT_DIR})){
-      if (/^\w+.*(\.uc\.js|\.uc\.mjs|\.sys\.mjs)$/i.test(entry.leafName)) {
+      if (/^[A-Za-z0-9]+.*(\.uc\.js|\.uc\.mjs|\.sys\.mjs)$/i.test(entry.leafName)) {
         let script = ScriptData.fromFile(entry);
         this.scripts.push(script);
         if(disabledScripts.includes(script.filename)){

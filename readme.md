@@ -110,6 +110,25 @@ For window scoped scripts (classic `.uc.js` and `.uc.mjs`) it the toggling shoul
 
 A global preference to toggle all scripts is `userChromeJS.enabled`. This will disable all scripts but leaves the restart-button in the custom menu available.
 
+## Filenames
+
+Script files (among other things) are loaded using `chrome://` protocol. Chrome urls are of form:
+
+```
+chrome://<package>/<provider>/<path>
+
+eg.
+
+chrome://userscripts/content/my_script.uc.js
+```
+
+Notable for the `path` part, it must *start* with `[a-zA-Z0-9]` and as such the loader module only tries to seek script files where the filename starts with alphanumeric character. Note that files in sub-directories *can* still start with some other character.
+
+Same limitation also applies to all other uses of `chrome://` urls, such as if you try to load some file from your `resources`
+directory using chrome url.
+
+[See more about chrome url canonification at searchfox](https://searchfox.org/mozilla-central/rev/3c7b40d1d74c26a82486f38b5828c3f3a43e05da/chrome/nsChromeRegistry.cpp#175)
+
 # API
 
 This manager is NOT entirely compatible with all existing userScripts - specifically scripts that expect a global `_uc` object or something similar to be available. This manager does export a `_ucUtils` object to window objects which is described in [Utils section]("#Utils").
