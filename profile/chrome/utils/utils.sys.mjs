@@ -141,7 +141,7 @@ export class YPref{
     throw new Error(`Unknown pref type: {type}`);
   }
   static setIfUnset(pref,value){
-    if(!Services.prefs.prefHasUserValue(pref)){
+    if(Services.prefs.getPrefType(pref) === 0){
       this.setPrefOfType(pref,this.getTypeof(value),value);
       return true
     }
