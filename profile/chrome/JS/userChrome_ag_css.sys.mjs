@@ -1,14 +1,11 @@
 // ==UserScript==
 // @name           userChrome_agent_css
 // @namespace      userChrome_Agent_Sheet_CSS
-// @version        0.0.6
+// @version        0.0.7
 // @description    Load userChrome.ag.css as agent sheet from resources folder using chrome: uri
-// @backgroundmodule
 // ==/UserScript==
 
-let EXPORTED_SYMBOLS = [];
 (function () {
-  const {Services} = ChromeUtils.import('resource://gre/modules/Services.jsm');
 	let sss = Cc['@mozilla.org/content/style-sheet-service;1'].getService(Ci.nsIStyleSheetService);
   
   // Try to load userChrome.ag.css as agent sheet
