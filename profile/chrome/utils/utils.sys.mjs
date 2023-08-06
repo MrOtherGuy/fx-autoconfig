@@ -216,17 +216,35 @@ function updateStyleSheet(name,type) {
 // This stores data we need to link from the boot.sys.mjs
 export const loaderModuleLink = new (function(){
   let sessionRestored = false;
+  let variant = null;
+  let brandName = null;
   this.setup = (ref,aVersion,aBrandName,aVariant,aSharedGlobal,aScriptData) => {
     this.scripts = ref.scripts;
     this.version = aVersion;
     this.sharedGlobal = aSharedGlobal;
-    this.brandName = aBrandName;
-    this.variant = aVariant;
+    brandName = aBrandName;
+    variant = aVariant;
     this.scriptDataConstructor = aScriptData;
     delete this.setup;
     Object.freeze(this);
     return
   }
+  Object.defineProperty(this,"variant",{ get: () => {
+    if(variant === null){
+      let is_tb = ChromeUtils.importESModule("resource://gre/modules/AppConstants.sys.mjs").AppConstants.BROWSER_CHROME_URL.startsWith("chrome://messenger");
+      variant = {
+        THUNDERBIRD: is_tb,
+        FIREFOX: !is_tb
+      }
+    }
+    return variant
+  }});
+  Object.defineProperty(this,"brandName",{ get: () => {
+    if(brandName === null){
+      brandName = ChromeUtils.importESModule("resource://gre/modules/AppConstants.sys.mjs").AppConstants.MOZ_APP_DISPLAYNAME_DO_NOT_USE
+    }
+    return brandName
+  }});
   this.setSessionRestored = () => { sessionRestored = true };
   this.sessionRestored = () => sessionRestored;
   return this
@@ -566,21 +584,19 @@ export class _ucUtils{
       return Promise.reject(new Error("reference is not a window"))
     }
   }
-  static get windows(){
-    return {
-      get: function (onlyBrowsers = true) {
-        let windowType = loaderModuleLink.variant.FIREFOX ? "navigator:browser" : "mail:3pane";
-        let windows = Services.wm.getEnumerator(onlyBrowsers ? windowType : null);
-        let wins = [];
-        while (windows.hasMoreElements()) {
-          wins.push(windows.getNext());
-        }
-        return wins
-      },
-      forEach: function(fun,onlyBrowsers = true){
-        let wins = this.get(onlyBrowsers);
-        wins.forEach((w)=>(fun(w.document,w)))
+  static windows = {
+    get: function (onlyBrowsers = true) {
+      let windowType = loaderModuleLink.variant.FIREFOX ? "navigator:browser" : "mail:3pane";
+      let windows = Services.wm.getEnumerator(onlyBrowsers ? windowType : null);
+      let wins = [];
+      while (windows.hasMoreElements()) {
+        wins.push(windows.getNext());
       }
+      return wins
+    },
+    forEach: function(fun,onlyBrowsers = true){
+      let wins = this.get(onlyBrowsers);
+      wins.forEach((w)=>(fun(w.document,w)))
     }
   }
 }
