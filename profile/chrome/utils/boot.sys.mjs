@@ -1,6 +1,6 @@
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 import { FileSystem as FS } from "chrome://userchromejs/content/fs.sys.mjs";
-import { _ucUtils as utils, ScriptInfo, loaderModuleLink, YPref } from "chrome://userchromejs/content/utils.sys.mjs";
+import { _ucUtils as utils, ScriptInfo, loaderModuleLink, Pref } from "chrome://userchromejs/content/utils.sys.mjs";
 
 const FX_AUTOCONFIG_VERSION = "0.8";
 console.warn( "Browser is executing custom scripts via autoconfig" );
@@ -199,9 +199,9 @@ class ScriptData {
   }
 }
 
-YPref.setIfUnset(PREF_ENABLED,true);
-YPref.setIfUnset(PREF_SCRIPTSDISABLED,"");
-YPref.setIfUnset(PREF_GBROWSERHACKENABLED,false);
+Pref.setIfUnset(PREF_ENABLED,true);
+Pref.setIfUnset(PREF_SCRIPTSDISABLED,"");
+Pref.setIfUnset(PREF_GBROWSERHACKENABLED,false);
 
 function showgBrowserNotification(){
   Services.prefs.setBoolPref(PREF_GBROWSERHACKENABLED,true);
@@ -444,7 +444,7 @@ const _ucjs = !Services.appinfo.inSafeMode && new UserChrome_js();
 _ucjs && utils.startupFinished().then(() => {
   _ucjs.SESSION_RESTORED = true;
   _ucjs.GBROWSERHACK_ENABLED === 2 && showgBrowserNotification();
-  if(YPref.setIfUnset("userChromeJS.firstRunShown",true)){
+  if(Pref.setIfUnset("userChromeJS.firstRunShown",true)){
     utils.showNotification({
       type: "fx-autoconfig-installed",
       label: `fx-autoconfig: ${utils.brandName} is being modified with custom autoconfig scripting`

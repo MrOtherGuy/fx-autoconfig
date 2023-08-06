@@ -1,10 +1,13 @@
 import { FileSystem as FS } from "chrome://userchromejs/content/fs.sys.mjs";
 
-export class YPref{
+export class Pref{
   #type;
   #name;
   #observerCallbacks;
   constructor(pref,type,value){
+    if(!(this instanceof Pref)){
+      return Pref.fromName(pref)
+    }
     this.#name = pref;
     this.#type = type;
   }
@@ -16,7 +19,7 @@ export class YPref{
   }
   get value(){
     try{
-      return YPref.getPrefOfType(this.#name,this.#type)
+      return Pref.getPrefOfType(this.#name,this.#type)
     }catch(ex){
       this.#type = 0
     }
@@ -45,9 +48,9 @@ export class YPref{
     return "invalid"
   }
   setTo(some){
-    const someType = YPref.getTypeof(some);
+    const someType = Pref.getTypeof(some);
     if(someType > 0 && someType === this.#type || this.#type === 0){
-      return YPref.setPrefOfType(this.#name,someType,some);
+      return Pref.setPrefOfType(this.#name,someType,some);
     }
     throw new Error("Can't set pref to a different type")
   }
@@ -148,10 +151,6 @@ export class YPref{
     return false
   }
 }
-export function Pref(name){
-  return YPref.fromName(name)
-}
-
 
 function updateStyleSheet(name,type) {
   if(type){
@@ -379,11 +378,11 @@ export class _ucUtils{
     return ScriptInfo.fromString(aName, FS.StringContent({content: aString}))
   }
   static prefs = {
-    get: (prefPath) => YPref.fromName(prefPath),
-    set: (prefName, value) => YPref.fromName(prefName).setTo(value),
-    setIfUnset: (prefName,value) => YPref.setIfUnset(prefName,value),
+    get: (prefPath) => Pref.fromName(prefPath),
+    set: (prefName, value) => Pref.fromName(prefName).setTo(value),
+    setIfUnset: (prefName,value) => Pref.setIfUnset(prefName,value),
     addListener:(a,b) => {
-      let o = (q,w,e)=>(b(YPref.fromName(e),e));
+      let o = (q,w,e)=>(b(Pref.fromName(e),e));
       Services.prefs.addObserver(a,o);
       return{pref:a,observer:o}
     },
