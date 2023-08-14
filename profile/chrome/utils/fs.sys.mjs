@@ -34,6 +34,7 @@ export class FileSystem{
   static{
     this.SCRIPT_DIR = this.resolveChromePath('chrome://userscripts/content/');
     this.RESOURCE_DIR = this.resolveChromePath('chrome://userchrome/content/');
+    this.STYLE_DIR = this.resolveChromePath('chrome://userstyles/skin/');
     this.BASE_FILEURI = this.getFileURIForFile(Services.dirsvc.get('UChrm',Ci.nsIFile),this.RESULT_DIRECTORY);
   }
   
@@ -288,7 +289,12 @@ class FileSystemResult{
     return this.#type === FileSystem.RESULT_ERROR
   }
   [Symbol.iterator](){
-    return this.entries()
+    try{
+      return this.entries()
+    }catch(e){
+      console.warn(e)
+    }
+    return { next() { return { done: true } } }
   };
   entries(){
     if(!this.isDirectory()){

@@ -1,6 +1,6 @@
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 import { FileSystem as FS } from "chrome://userchromejs/content/fs.sys.mjs";
-import { _ucUtils as utils, ScriptInfo, loaderModuleLink, Pref } from "chrome://userchromejs/content/utils.sys.mjs";
+import { _ucUtils as utils, loaderModuleLink, Pref } from "chrome://userchromejs/content/utils.sys.mjs";
 
 const FX_AUTOCONFIG_VERSION = "0.8";
 console.warn( "Browser is executing custom scripts via autoconfig" );
@@ -35,7 +35,11 @@ class ScriptData {
   #preCompiledESM;
   #preCompileFailed;
   #preCompiling;
-  constructor(leafName, headerText, noExec){
+  #preLoadedStyle;
+  #chromeURI;
+  #isRunning = false;
+  #injectionFailed = false;
+  constructor(leafName, headerText, noExec, isStyle){
     const hasLongDescription = (/^\/\/\ @long-description/im).test(headerText);
     this.filename = leafName;
     this.name = headerText.match(/\/\/ @name\s+(.+)\s*$/im)?.[1];
@@ -57,10 +61,13 @@ class ScriptData {
     this.onlyonce = /\/\/ @onlyonce\b/.test(headerText);
     this.inbackground = this.filename.endsWith(".sys.mjs") || /\/\/ @backgroundmodule\b/.test(headerText);
     this.ignoreCache = /\/\/ @ignorecache\b/.test(headerText);
-    this.isRunning = false;
-    this.injectionFailed = false;
     this.manifest = headerText.match(/\/\/ @manifest\s+(.+)\s*$/im)?.[1];
-    this.noExec = noExec;
+    this.type = isStyle ? "style" : "script";
+    this.styleSheetMode = isStyle 
+      ? headerText.match(/\/\/ @stylemode\s+(.+)\s*$/im)?.[1] === "agent_sheet"
+        ? "agent" : "author"
+      : null;
+    this.noExec = isStyle || noExec;
     // Construct regular expression to use to match target document
     let match, rex = {
       include: [],
@@ -85,68 +92,115 @@ class ScriptData {
       this.loadOrder = Number.parseInt(loadOrder) || 10;
     }
     
-    Object.seal(this);
+    Object.freeze(this);
   }
   get isEnabled() {
     return getDisabledScripts().indexOf(this.filename) === -1;
   }
-  preCompileMJS(){
-    if(this.#preCompiledESM){
-      return Promise.resolve(this.#preCompiledESM)
+  get injectionFailed(){
+    return this.#injectionFailed
+  }
+  get isRunning(){
+    return this.#isRunning
+  }
+  get chromeURI(){
+    if(!this.#chromeURI){
+      this.#chromeURI = this.type === "style"
+        ? Services.io.newURI(`chrome://userstyles/skin/${this.filename}`)
+        : Services.io.newURI(`chrome://userscripts/content/${this.filename}`)
     }
-    if(this.#preCompileFailed){
+    return this.#chromeURI
+  }
+  get preLoadedStyle(){
+    return this.#preLoadedStyle
+  }
+  static preCompileMJS(aScript){
+    if(aScript.#preCompiledESM){
+      return Promise.resolve(aScript.#preCompiledESM)
+    }
+    if(aScript.#preCompileFailed){
       return Promise.resolve(null);
     }
-    if(this.#preCompiling){
-      return this.#preCompiling
+    if(aScript.#preCompiling){
+      return aScript.#preCompiling
     }
-    this.#preCompiling = new Promise( resolve => {
-      ChromeUtils.compileScript(`data:,"use strict";import("chrome://userscripts/content/${this.filename}").catch(console.error)`)
+    aScript.#preCompiling = new Promise( resolve => {
+      ChromeUtils.compileScript(`data:,"use strict";import("chrome://userscripts/content/${aScript.filename}").catch(console.error)`)
       .then( script => {
-        this.#preCompiledESM = script;
+        aScript.#preCompiledESM = script;
         resolve(script);
       })
-      .catch( (ex) => resolve(ScriptData.onCompileRejection(ex,this.filename)) )
-      .finally(()=>{this.#preCompiling = null})
+      .catch( (ex) => resolve(ScriptData.onCompileRejection(ex,aScript.filename)) )
+      .finally(()=>{aScript.#preCompiling = null})
     });
-    return this.#preCompiling
+    return aScript.#preCompiling
   }
   static onCompileRejection(ex,script){
     script.#preCompileFailed = true;
     console.error(`@ ${script.filename}: script couldn't be compiled because:`,ex);
     return null
   }
-  tryLoadIntoWindow(win){
-    if (this.inbackground || this.noExec || !this.regex.test(win.location.href)) {
+  static preLoadAuthorStyle(aStyle){
+    if(aStyle.#injectionFailed){
+      console.warn(`ignoring style preload for ${aStyle.filename} because it has already failed`);
+      return false
+    }
+    let sss = Cc['@mozilla.org/content/style-sheet-service;1'].getService(Ci.nsIStyleSheetService);
+    try{
+      // Try to preload the file and store it
+      aStyle.#preLoadedStyle = sss.preloadSheet(aStyle.chromeURI, sss.AUTHOR_SHEET);
+    }catch(e){
+      console.error(`Could not pre-load ${aStyle.filename}: ${e.name}`)
+      return false
+    }
+    aStyle.#isRunning = true;
+    return true
+  }
+  
+  static tryLoadScriptIntoWindow(aScript,win){
+    if(!aScript.regex.test(win.location.href)){
       return
     }
-    if(this.onlyonce && this.isRunning) {
-      if(this.startup){
-        SHARED_GLOBAL[this.startup]._startup(win)
+    if(aScript.type === "style" && aScript.styleSheetMode === "author"){
+      if(!aScript.#preLoadedStyle){
+        let success = ScriptData.preLoadAuthorStyle(aScript);
+        if(!success){
+          return
+        }
+      }
+      win.windowUtils.addSheet(aScript.#preLoadedStyle,Ci.nsIDOMWindowUtils.AUTHOR_SHEET);
+      return
+    }
+    if (aScript.inbackground || aScript.noExec) {
+      return
+    }
+    if(aScript.onlyonce && aScript.#isRunning) {
+      if(aScript.startup){
+        SHARED_GLOBAL[aScript.startup]._startup(win)
       }
       return
     }
-    const injection = this.isESM
-      ? ScriptData.injectESMIntoGlobal(this,win)
-      : ScriptData.injectClassicScriptIntoGlobal(this,win);
+    const injection = aScript.isESM
+      ? ScriptData.injectESMIntoGlobal(aScript,win)
+      : ScriptData.injectClassicScriptIntoGlobal(aScript,win);
     injection
     .catch(ex => {
-      console.error(new Error(`@ ${this.filename}:${ex.lineNumber}`,{cause:ex}));
+      console.error(new Error(`@ ${aScript.filename}:${ex.lineNumber}`,{cause:ex}));
     })
   }
   static markScriptRunning(aScript,aGlobal){
-    aScript.isRunning = true;
+    aScript.#isRunning = true;
     aScript.startup && SHARED_GLOBAL[aScript.startup]._startup(aGlobal);
     return
   }
   static injectESMIntoGlobal(aScript,aGlobal){
     return new Promise((resolve,reject) => {
-      aScript.preCompileMJS()
+      ScriptData.preCompileMJS(aScript)
       .then(script => script && script.executeInGlobal(aGlobal))
       .then(() => ScriptData.markScriptRunning(aScript,aGlobal))
       .then(resolve)
       .catch( ex => {
-        aScript.injectionFailed = true;
+        aScript.#injectionFailed = true;
         reject(ex)
       })
     })
@@ -163,39 +217,48 @@ class ScriptData {
       ScriptData.markScriptRunning(aScript,aGlobal)
       return Promise.resolve(1)
     }catch(ex){
-      aScript.injectionFailed = true;
+      aScript.#injectionFailed = true;
       ScriptData.markScriptRunning(aScript,aGlobal)
       return Promise.reject(ex)
     }
   }
-  getInfo(isEnabledOverride){
-    return ScriptInfo.fromScript(this,isEnabledOverride === undefined ? this.isEnabled : isEnabledOverride);
-  }
-  registerManifest(){
-    if(this.isRunning){
+  static registerScriptManifest(aScript){
+    if(aScript.#isRunning){
       return
     }
-    let cmanifest = FS.getEntry(`${this.manifest}.manifest`, {baseDirectory: FS.SCRIPT_DIR});
+    let cmanifest = FS.getEntry(`${aScript.manifest}.manifest`, {baseDirectory: FS.SCRIPT_DIR});
     if(cmanifest.isFile()){
       Components.manager
       .QueryInterface(Ci.nsIComponentRegistrar).autoRegister(cmanifest.entry());
     }else{
-      console.warn(`Script '${this.filename}' tried to register a manifest but requested file '${this.manifest}' doesn't exist`);
+      console.warn(`Script '${aScript.filename}' tried to register a manifest but requested file '${aScript.manifest}' doesn't exist`);
     }
   }
-  static extractHeaderText(aFSResult){
+  static extractScriptHeader(aFSResult){
     return aFSResult.content()
       .match(/^\/\/ ==UserScript==\s*[\n\r]+(?:.*[\n\r]+)*?\/\/ ==\/UserScript==\s*/m)?.[0] || ""
   }
-  static fromFile(aFile){
+  static extractStyleHeader(aFSResult){
+    return aFSResult.content()
+      .match(/^\/\* ==UserScript==\s*[\n\r]+(?:.*[\n\r]+)*?\/\/ ==\/UserScript==\s*\*\//m)?.[0] || ""
+  }
+  static fromScriptFile(aFile){
     if(aFile.fileSize < 24){
       // Smaller files can't possibly have a valid header
-      return new ScriptData(aFile.leafName,"",aFile.fileSize === 0)
+      return new ScriptData(aFile.leafName,"",aFile.fileSize === 0,false)
     }
     const result = FS.readFileSync(aFile,{ metaOnly: true });
-    const headerText = this.extractHeaderText(result);
+    const headerText = this.extractScriptHeader(result);
     // If there are less than 2 bytes after the header then we mark the script as non-executable. This means that if the file only has a header then we don't try to inject it to any windows, since it wouldn't do anything.
-    return new ScriptData(aFile.leafName, headerText, headerText.length > aFile.fileSize - 2);
+    return new ScriptData(aFile.leafName, headerText, headerText.length > aFile.fileSize - 2,false);
+  }
+  static fromStyleFile(aFile){
+    if(aFile.fileSize < 24){
+      // Smaller files can't possibly have a valid header
+      return new ScriptData(aFile.leafName,"",true,true)
+    }
+    const result = FS.readFileSync(aFile,{ metaOnly: true });
+    return new ScriptData(aFile.leafName, this.extractStyleHeader(result), true,true);
   }
 }
 
@@ -282,10 +345,25 @@ function updateMenuStatus(event){
 class UserChrome_js{
   constructor(){
     this.scripts = [];
+    this.styles = [];
     this.SESSION_RESTORED = false;
     this.isInitialWindow = true;
     this.initialized = false;
     this.init();
+  }
+  registerScript(aScript,isEnabled){
+    if(aScript.type === "script"){
+      this.scripts.push(aScript);
+    }else{
+      this.styles.push(aScript);
+    }
+    if(isEnabled && aScript.manifest){
+      try{
+        ScriptData.registerScriptManifest(aScript);
+      }catch(ex){
+        console.error(new Error(`@ ${aScript.filename}`,{cause:ex}));
+      }
+    }
   }
   init(){
     if(this.initialized){
@@ -300,18 +378,8 @@ class UserChrome_js{
     // load script data
     for(let entry of FS.getEntry('',{baseDirectory: FS.SCRIPT_DIR})){
       if (/^[A-Za-z0-9]+.*(\.uc\.js|\.uc\.mjs|\.sys\.mjs)$/i.test(entry.leafName)) {
-        let script = ScriptData.fromFile(entry);
-        this.scripts.push(script);
-        if(disabledScripts.includes(script.filename)){
-          continue
-        }
-        if(script.manifest){
-          try{
-            script.registerManifest();
-          }catch(ex){
-            console.error(new Error(`@ ${script.filename}`,{cause:ex}));
-          }
-        }
+        let script = ScriptData.fromScriptFile(entry);
+        this.registerScript(script,!disabledScripts.includes(script.filename));
         if(script.inbackground){
           try{
             const fileName = `chrome://userscripts/content/${script.filename}`;
@@ -320,24 +388,58 @@ class UserChrome_js{
             }else{
               ChromeUtils.import( fileName );
             }
-            script.isRunning = true;
+            ScriptData.markScriptRunning(script,null);
           }catch(ex){
             console.error(new Error(`@ ${script.filename}`,{cause:ex}));
           }
         }
         if(script.isESM && !script.inbackground){
-          script.preCompileMJS();
+          ScriptData.preCompileMJS(script);
         }
       }
+    }
+    let agentStyleSet = new Set();
+    for(let entry of FS.getEntry('',{baseDirectory: FS.STYLE_DIR})){
+      if (/^[A-Za-z0-9]+.*\.uc\.css$/i.test(entry.leafName)) {
+        let style = ScriptData.fromStyleFile(entry);
+        this.registerScript(style,!disabledScripts.includes(style.filename));
+        if(style.styleSheetMode === "agent"){
+          agentStyleSet.add(style);
+        }
+      }
+    }
+    if(agentStyleSet.size > 0){
+      this.addAgentStyles(agentStyleSet);
+      agentStyleSet.clear();
     }
     this.scripts.sort((a,b) => a.loadOrder - b.loadOrder);
     Services.obs.addObserver(this, 'domwindowopened', false);
     this.initialized = true;
   }
+  addAgentStyles(agentStyles){
+    let sss = Cc['@mozilla.org/content/style-sheet-service;1'].getService(Ci.nsIStyleSheetService);
+    for(let style of agentStyles){
+      try{
+        sss.loadAndRegisterSheet(style.chromeURI, sss.AGENT_SHEET);
+        ScriptData.markScriptRunning(style);
+      }catch(e){
+        console.error(e);
+        console.error(`Could not load ${style.filename}: ${e.name}`);
+      }
+    }
+  }
   onDOMContent(document){
     const window = document.defaultView;
     if(!(/^chrome:(?!\/\/global\/content\/(commonDialog|alerts\/alert)\.xhtml)|about:(?!blank)/i).test(window.location.href)){
       // Don't inject scripts to modal prompt windows or notifications
+      if(this.styles.length > 0){
+        const disabledScripts = getDisabledScripts();
+        for(let style of this.styles){
+          if(!disabledScripts.includes(style.filename)){
+            ScriptData.tryLoadScriptIntoWindow(style,window)
+          }
+        }
+      }
       return
     }
     ChromeUtils.defineESModuleGetters(window,{
@@ -371,23 +473,43 @@ class UserChrome_js{
           continue
         }
         if(!disabledScripts.includes(script.filename)){
-          script.tryLoadIntoWindow(window)
+          ScriptData.tryLoadScriptIntoWindow(script,window)
+        }
+      }
+      for(let style of this.styles){
+        if(!disabledScripts.includes(style.filename)){
+          ScriptData.tryLoadScriptIntoWindow(style,window)
         }
       }
     }
     if(window.isChromeWindow){
-      this.maybeAddScriptMenuItemsToWindow(window);
+      const menu = document.querySelector(
+      APP_VARIANT.FIREFOX ? "#menu_openDownloads" : "menuitem#addressBook");
+      if(menu){
+        menu.parentNode.addEventListener("popupshown",
+          (ev) => this.generateScriptMenuItemsIfNeeded(ev.target.ownerDocument),
+          {once: true}
+        );
+      }
     }
   }
+
   // Add simple script menu to menubar tools popup
-  maybeAddScriptMenuItemsToWindow(window){
-    const document = window.document;
-    const menu = document.querySelector(
-      APP_VARIANT.FIREFOX ? "#menu_openDownloads" : "menuitem#addressBook");
-    if(!menu){
-      // this probably isn't main browser window so we don't have suitable target menu
-      return
+  generateScriptMenuItemsIfNeeded(aDoc){
+    {
+      let menu = aDoc.getElementById("userScriptsMenu");
+      if(menu){
+        return menu
+      }
     }
+    const popup = aDoc.querySelector(
+      APP_VARIANT.FIREFOX ? "#menu_openDownloads" : "menuitem#addressBook")?.parentNode;
+
+    if(aDoc.location.href !== BROWSERCHROME || !popup){
+      return null
+    }
+    const window = aDoc.ownerGlobal;
+    
     window.MozXULElement.insertFTLIfNeeded("toolkit/about/aboutSupport.ftl");
     let menuFragment = window.MozXULElement.parseXULToFragment(`
       <menu id="userScriptsMenu" label="userScripts">
@@ -401,29 +523,39 @@ class UserChrome_js{
     `);
     const itemsFragment = window.MozXULElement.parseXULToFragment("");
     for(let script of this.scripts){
-      itemsFragment.append(
-        window.MozXULElement.parseXULToFragment(`
-          <menuitem type="checkbox"
-                    label="${escapeXUL(script.name || script.filename)}"
-                    filename="${escapeXUL(script.filename)}"
-                    checked="true"
-                    oncommand="_ucUtils.toggleScript(this)">
-          </menuitem>
-      `)
-      );
+      UserChrome_js.appendScriptMenuitemToFragment(window,itemsFragment,script);
+    }
+    if(this.styles.length){
+      itemsFragment.append(aDoc.createXULElement("menuseparator"));
+      for(let style of this.styles){
+        UserChrome_js.appendScriptMenuitemToFragment(window,itemsFragment,style);
+      }
     }
     menuFragment.getElementById("menuUserScriptsPopup").prepend(itemsFragment);
-    menu.parentNode.insertBefore(menuFragment,menu);
-    menu.parentNode.querySelector("#menuUserScriptsPopup").addEventListener("popupshown",updateMenuStatus);
-    document.l10n.formatValues(["restart-button-label","clear-startup-cache-label","show-dir-label"])
+    popup.prepend(menuFragment);
+    popup.querySelector("#menuUserScriptsPopup").addEventListener("popupshown",updateMenuStatus);
+    aDoc.l10n.formatValues(["restart-button-label","clear-startup-cache-label","show-dir-label"])
     .then(values => {
       let baseTitle = `${values[0]} ${utils.brandName}`;
-      document.getElementById("userScriptsMenu-Restart").setAttribute("label", baseTitle);
-      document.getElementById("userScriptsMenu-ClearCache").setAttribute("label", values[1].replace("…","") + " & " + baseTitle);
-      document.getElementById("userScriptsMenu-OpenFolder").setAttribute("label",values[2])
-    })
+      aDoc.getElementById("userScriptsMenu-Restart").setAttribute("label", baseTitle);
+      aDoc.getElementById("userScriptsMenu-ClearCache").setAttribute("label", values[1].replace("…","") + " & " + baseTitle);
+      aDoc.getElementById("userScriptsMenu-OpenFolder").setAttribute("label",values[2])
+    });
+    return popup.querySelector("#userScriptsMenu");
   }
-  
+  static appendScriptMenuitemToFragment(aWindow,aFragment,aScript){
+    aFragment.append(
+      aWindow.MozXULElement.parseXULToFragment(`
+        <menuitem type="checkbox"
+                  label="${escapeXUL(aScript.name || aScript.filename)}"
+                  filename="${escapeXUL(aScript.filename)}"
+                  checked="true"
+                  oncommand="_ucUtils.toggleScript(this)">
+        </menuitem>
+    `)
+    );
+    return
+  }
   observe(aSubject, aTopic, aData) {
     aSubject.addEventListener('DOMContentLoaded', this, true);
   }

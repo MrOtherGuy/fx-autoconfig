@@ -1,3 +1,4 @@
 content userchromejs ../../../profile/chrome/utils/
 content userscripts ../tests/
+skin userstyles classic/1.0 ../css/
 content userchrome ../resources/

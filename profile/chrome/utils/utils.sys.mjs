@@ -152,7 +152,56 @@ export class Pref{
   }
 }
 
-function updateStyleSheet(name,type) {
+function reRegisterStyleWithQualifiedURI(aURI,aType){
+  let sss = Cc['@mozilla.org/content/style-sheet-service;1'].getService(Ci.nsIStyleSheetService);
+  try{
+    switch(aType){
+      case "agent":
+        sss.unregisterSheet(aURI,sss.AGENT_SHEET);
+        sss.loadAndRegisterSheet(aURI,sss.AGENT_SHEET);
+        return true
+      case "author":
+        sss.unregisterSheet(aURI,sss.AUTHOR_SHEET);
+        sss.loadAndRegisterSheet(aURI,sss.AUTHOR_SHEET);
+        return true
+      default:
+        return false
+    }
+  }catch(e){
+    console.error(e);
+    return false
+  }
+}
+
+function updateRegisteredStyleSheet(name) {
+  let registeredStyles = loaderModuleLink.styles;
+  if(!registeredStyles){
+    throw new Error("updateStyleSheet was called in a context without loader module access");
+  }
+  let matchingStyle = registeredStyles.find( s => s.filename === name);
+  if(!matchingStyle){
+    console.warn(`No registered style exists with name: ${name}`);
+    return false
+  }
+  if(matchingStyle.styleSheetMode === "agent"){
+    return reRegisterStyleWithQualifiedURI(matchingStyle.chromeURI,"agent")
+  }else{
+    let success = loaderModuleLink.scriptDataConstructor.preLoadAuthorStyle(matchingStyle);
+    if(success){
+      const styleSheetType = 2; // styleSheetService.AUTHOR_SHEET
+      let windows = Services.wm.getEnumerator(null);
+      while (windows.hasMoreElements()) {
+        let win = windows.getNext();
+        if(matchingStyle.regex.test(win.location.href)){
+          win.windowUtils.removeSheet(matchingStyle.chromeURI, styleSheetType);
+          win.windowUtils.addSheet(matchingStyle.preLoadedStyle,styleSheetType);
+        }
+      }
+    }
+    return success
+  }
+}
+function updateStyleSheet(name, type) {
   if(type){
     let sss = Cc['@mozilla.org/content/style-sheet-service;1'].getService(Ci.nsIStyleSheetService);
     try{
@@ -204,24 +253,29 @@ function updateStyleSheet(name,type) {
   // each instace but that's OK since sheets.find below will
   // only find the first instance and reload that which is
   // "probably" fine.
-  let entryFilePath = `file:///${fsResult.entry().path.replaceAll("\\","/")}`;
-  
-  let target = sheets.find(sheet => sheet.href === entryFilePath);
+  //let entryFilePath = `file:///${fsResult.entry().path.replaceAll("\\","/")}`;
+  //const entryFilePath = fsResult.fileURI;
+  let target = sheets.find(sheet => sheet.href === fsResult.fileURI);
   if(target){
     recentWindow.InspectorUtils.parseStyleSheet(target,fsResult.readSync());
     return true
   }
   return false
 }
-// This stores data we need to link from the boot.sys.mjs
+// This stores data we need to link from the loader module
 export const loaderModuleLink = new (function(){
   let sessionRestored = false;
   let variant = null;
   let brandName = null;
+  // .setup() is called once by boot.sys.mjs on startup
   this.setup = (ref,aVersion,aBrandName,aVariant,aSharedGlobal,aScriptData) => {
     this.scripts = ref.scripts;
+    this.styles = ref.styles;
     this.version = aVersion;
     this.sharedGlobal = aSharedGlobal;
+    this.getScriptMenu = (aDoc) => {
+      return ref.generateScriptMenuItemsIfNeeded(aDoc);
+    }
     brandName = aBrandName;
     variant = aVariant;
     this.scriptDataConstructor = aScriptData;
@@ -262,12 +316,15 @@ export class ScriptInfo{
     let info = new ScriptInfo(isEnabled);
     Object.assign(info,aScript);
     info.regex = new RegExp(aScript.regex.source, aScript.regex.flags);
+    info.chromeURI = aScript.chromeURI.spec;
+    info.isRunning = aScript.isRunning;
+    info.injectionFailed = aScript.injectionFailed;
     return info
   }
   static fromString(aName, aStringAsFSResult) {
     const ScriptData = loaderModuleLink.scriptDataConstructor;
-    const headerText = ScriptData.extractHeaderText(aStringAsFSResult);
-    const scriptData = new ScriptData(aName, headerText, headerText.length > aStringAsFSResult.size - 2);
+    const headerText = ScriptData.extractScriptHeader(aStringAsFSResult);
+    const scriptData = new ScriptData(aName, headerText, headerText.length > aStringAsFSResult.size - 2,false);
     return ScriptInfo.fromScript(scriptData, false)
   }
 }
@@ -340,25 +397,33 @@ export class _ucUtils{
     });
   }
   static fs = FS;
-  static getScriptData(aFilter){
+  static #getScriptInfoForType(aFilter,aScriptList){
     const filterType = typeof aFilter;
     if(aFilter && !(filterType === "string" || filterType === "function")){
       throw "getScriptData() called with invalid filter type: "+filterType
     }
-    const _ucScripts = loaderModuleLink.scripts;
     if(filterType === "string"){
-      let script = _ucScripts.find(s => s.filename === aFilter);
-      return script ? script.getInfo() : null;
+      let script = aScriptList.find(s => s.filename === aFilter);
+      return script ? ScriptInfo.fromScript(script,script.isEnabled) : null;
     }
     const disabledScripts = Services.prefs.getStringPref('userChromeJS.scriptsDisabled',"").split(",");
     if(filterType === "function"){
-      return _ucScripts.filter(aFilter).map(
-        (script) => script.getInfo(!disabledScripts.includes(script.filename))
+      return aScriptList.filter(aFilter).map(
+        script => ScriptInfo.fromScript(script,!disabledScripts.includes(script.filename))
       );
     }
-    return _ucScripts.map(
-      (script) => script.getInfo(!disabledScripts.includes(script.filename))
+    return aScriptList.map(
+      script => ScriptInfo.fromScript(script,!disabledScripts.includes(script.filename))
     );
+  }
+  static getScriptData(aFilter){
+    return _ucUtils.#getScriptInfoForType(aFilter, loaderModuleLink.scripts)
+  }
+  static getStyleData(aFilter){
+    return _ucUtils.#getScriptInfoForType(aFilter, loaderModuleLink.styles)
+  }
+  static getScriptMenuForDocument(doc){
+    return doc.getElementById("userScriptsMenu") || loaderModuleLink.getScriptMenu(doc)
   }
   static loadURI(win,desc){
     if(loaderModuleLink.variant.THUNDERBIRD){
@@ -547,6 +612,9 @@ export class _ucUtils{
     return script
   }
   static updateStyleSheet(name = "../userChrome.css",type){
+    if(name.endsWith(".uc.css")){
+      return updateRegisteredStyleSheet(name)
+    }
     return updateStyleSheet(name,type)
   }
   static get version(){

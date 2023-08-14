@@ -232,7 +232,7 @@ Above line is also left empty
       }
       return names.join(",");
     }
-  ).expect("resources,tests,utils"),
+  ).expect("css,resources,tests,utils"),
 
   // Get File object from file name
   new Test(
@@ -343,6 +343,24 @@ Above line is also left empty
     () => _ucUtils.getScriptData(s => s.inbackground).length
   ).expect(3),
   
+  // Test getting correct chromeURI via ScriptInfo
+  new Test(
+    "getScriptInfoChromeURI",
+    () => _ucUtils.getScriptData("utils_tests.uc.js").chromeURI
+  ).expect("chrome://userscripts/content/utils_tests.uc.js"),
+
+  // Test getting correct chromeURI via ScriptInfo for styles
+  new Test(
+    "getStyleInfo",
+    () => _ucUtils.getStyleData().length
+  ).expect(2),
+  
+  // Test getting correct chromeURI via ScriptInfo for styles
+  new Test(
+    "getStyleInfoChromeURI",
+    () => _ucUtils.getStyleData("author_style.uc.css").chromeURI
+  ).expect("chrome://userstyles/skin/author_style.uc.css"),
+  
   // test single-line script descriptions
   new Test(
     "single-line script descriptions",
@@ -370,7 +388,16 @@ Above line is also left empty
   ).expect((val) => val === "Firefox"),
 
   // TODO togglescript
-
+  
+  // Check if script menu is available (this test runs in browser.xhtml context)
+  new Test(
+    "getScriptMenu",
+    () => {
+      let before = document.getElementById("userScriptsMenu") ? 0 : 1;
+      let after = _ucUtils.getScriptMenuForDocument(document).menupopup ? 2 : 0;
+      return before + after;
+    }).expect(3),
+  
   // Set the pref to false (if it wasn't already) for the following tests
   Promise.resolve(_ucUtils.prefs.set(PREF_ALLLOW_UNSAFE,false)),
 
