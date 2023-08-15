@@ -262,6 +262,20 @@ Above line is also left empty
     }
   ).expect(`${_ucUtils.fs.BASE_FILEURI}resources/test_file.txt`),
   
+  new Test(
+    "createEmptyFileURI",
+    () => {
+      return _ucUtils.fs.createFileURI("").split("/").slice(-4).join("/");
+    }
+  ).expect("test_profile/chrome/resources/"),
+  
+  new Test(
+    "createNonEmptyFileURI",
+    () => {
+      return _ucUtils.fs.createFileURI("test.txt").split("/").slice(-4).join("/");
+    }
+  ).expect("test_profile/chrome/resources/test.txt"),
+  
   // return list of script names in directory (not file names)
   // Note: aaa_test_script.uc.js does not have a name so it should be first
   new Test(

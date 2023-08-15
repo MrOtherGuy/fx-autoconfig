@@ -15,21 +15,6 @@ export class FileSystem{
     }
     throw ResultError.fromKind(this.ERROR_KIND_INVALID_ARGUMENT,{expected: "FileSystem.RESULT_FILE | FileSystem.RESULT_DIRECTORY"})
   }
-
-  static resolveChromePath(str){
-    let parts = this.resolveChromeURL(str).split("/");
-    return parts.slice(parts.indexOf("chrome") + 1,parts.length - 1).join("/");
-  }
-  
-  static resolveChromeURL(str){
-    const registry = Cc["@mozilla.org/chrome/chrome-registry;1"].getService(Ci.nsIChromeRegistry);
-    try{
-      return registry.convertChromeURL(Services.io.newURI(str.replace(/\\/g,"/"))).spec
-    }catch(e){
-      console.error(e);
-      return ""
-    }
-  }
   
   static convertChromeURIToFileURI(aURI){
     const registry = Cc["@mozilla.org/chrome/chrome-registry;1"].getService(Ci.nsIChromeRegistry);
@@ -38,11 +23,11 @@ export class FileSystem{
         ? aURI
         : Services.io.newURI(aURI)
     );
-    
   }
 
   static{
-    this.RESOURCE_DIR = this.resolveChromePath('chrome://userchrome/content/');
+    this.RESOURCE_DIR = this.convertChromeURIToFileURI('chrome://userchrome/content/')
+    .QueryInterface(Ci.nsIFileURL).file.parent.leafName;
     this.BASE_FILEURI = this.getFileURIForFile(Services.dirsvc.get('UChrm',Ci.nsIFile),this.RESULT_DIRECTORY);
   }
   
@@ -194,10 +179,11 @@ export class FileSystem{
     }
     return IOUtils.writeUTF8( fileName, content, options );
   }
-  static createFileURI(fileName = ""){
-    fileName = String(fileName);
-    let u = this.resolveChromeURL(`chrome://userchrome/content/${fileName}`);
-    return fileName ? u : u.substr(0,u.lastIndexOf("/") + 1); 
+  static createFileURI(fileName){
+    if(!fileName){
+      return this.getResourceDir().fileURI
+    }
+    return this.convertChromeURIToFileURI(`chrome://userchrome/content/${fileName}`).spec
   }
   static chromeDir(){
     return FileSystemResult.fromDirectory(Services.dirsvc.get('UChrm',Ci.nsIFile))

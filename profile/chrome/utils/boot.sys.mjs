@@ -226,7 +226,7 @@ class ScriptData {
     if(aScript.#isRunning){
       return
     }
-    let cmanifest = FS.getEntry(FS.convertChromeURIToFileURI(`chrome://userscripts/content/${aScript.manifest}`))
+    let cmanifest = FS.getEntry(FS.convertChromeURIToFileURI(`chrome://userscripts/content/${aScript.manifest}.manifest`));
     if(cmanifest.isFile()){
       Components.manager
       .QueryInterface(Ci.nsIComponentRegistrar).autoRegister(cmanifest.entry());
