@@ -282,9 +282,10 @@ Above line is also left empty
     "getScriptData",
     () => {
       let scripts = _ucUtils.getScriptData();
-      const names = scripts.sort((a, b) => (a.name < b.name ? -1 : 1))
-                    .map(a => a.name)
-                    .join(",")
+      const names = scripts
+      .sort((a, b) => (a.name < b.name ? -1 : 1))
+      .map(a => a.name)
+      .join(",")
       return scripts.length + ";" + names
     }
   ).expect(TEST_FILES.length+";,test_module_script,test_module_script_ESM,test_non_background_mjs,test_registering_manifest,test_runner,test_utils,test_utils_legacy,write-42,x_disabled"),

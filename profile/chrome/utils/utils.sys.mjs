@@ -577,9 +577,8 @@ export class _ucUtils{
         resolve();
       }else{
         const obs_topic = loaderModuleLink.variant.FIREFOX
-                    ? "sessionstore-windows-restored"
-                    : "mail-delayed-startup-finished";
-                    
+          ? "sessionstore-windows-restored"
+          : "browser-delayed-startup-finished";
         let observer = (subject, topic, data) => {
           Services.obs.removeObserver(observer, obs_topic);
           loaderModuleLink.setSessionRestored();
@@ -635,17 +634,13 @@ export class _ucUtils{
             return
           }
         }
-        const obs_topic = loaderModuleLink.variant.FIREFOX
-                          ? "browser-delayed-startup-finished"
-                          : "mail-delayed-startup-finished";
-                    
         let observer = (subject, topic, data) => {
           if(subject === win){
-            Services.obs.removeObserver(observer, obs_topic);
+            Services.obs.removeObserver(observer, "browser-delayed-startup-finished");
             resolve();
           }
         };
-        Services.obs.addObserver(observer, obs_topic);
+        Services.obs.addObserver(observer, "browser-delayed-startup-finished");
 
       });
     }else{
