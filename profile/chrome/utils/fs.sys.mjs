@@ -34,17 +34,17 @@ export class FileSystem{
   // All these call to .parent because chrome urls get implicit "filename" based on the provider
   static getResourceDir(){
     let base = this.convertChromeURIToFileURI('chrome://userchrome/content/');
-    return FileSystemResult.fromDirectory(base.QueryInterface(Ci.nsIFileURL).file.parent)
+    return FileSystemResult.fromNsIFile(base.QueryInterface(Ci.nsIFileURL).file.parent)
   }
   
   static getScriptDir(){
     let base = this.convertChromeURIToFileURI('chrome://userscripts/content/');
-    return FileSystemResult.fromDirectory(base.QueryInterface(Ci.nsIFileURL).file.parent)
+    return FileSystemResult.fromNsIFile(base.QueryInterface(Ci.nsIFileURL).file.parent)
   }
   
   static getStyleDir(){
     let base = this.convertChromeURIToFileURI('chrome://userstyles/skin/');
-    return FileSystemResult.fromDirectory(base.QueryInterface(Ci.nsIFileURL).file.parent)
+    return FileSystemResult.fromNsIFile(base.QueryInterface(Ci.nsIFileURL).file.parent)
   }
   
   static #getEntry(aFilename, baseDirectory){
