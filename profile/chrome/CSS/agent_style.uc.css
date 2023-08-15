@@ -1,17 +1,6 @@
 /* ==UserScript==
 // @name           agent style sheet
-// @description    agent style sheet to style tooltips
+// @description    an example for @stylemode directive
 // @stylemode      agent_sheet
 // ==/UserScript==
 */
-/* Default to xul namespace */
-@namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
-
-/* All your xul tooltips will be black */
-tooltip {
-  -moz-appearance: none;
-  background-color: rgb(15, 17, 34);
-  color: rgba(255, 255, 255, 1);
-  border: none;
-  padding: 5px;
-}
