@@ -30,12 +30,36 @@ export class FileSystem{
       return ""
     }
   }
+  
+  static convertChromeURIToFileURI(aURI){
+    const registry = Cc["@mozilla.org/chrome/chrome-registry;1"].getService(Ci.nsIChromeRegistry);
+    return registry.convertChromeURL(
+      aURI instanceof Ci.nsIURI
+        ? aURI
+        : Services.io.newURI(aURI)
+    );
+    
+  }
 
   static{
-    this.SCRIPT_DIR = this.resolveChromePath('chrome://userscripts/content/');
     this.RESOURCE_DIR = this.resolveChromePath('chrome://userchrome/content/');
-    this.STYLE_DIR = this.resolveChromePath('chrome://userstyles/skin/');
     this.BASE_FILEURI = this.getFileURIForFile(Services.dirsvc.get('UChrm',Ci.nsIFile),this.RESULT_DIRECTORY);
+  }
+  
+  // All these call to .parent because chrome urls get implicit "filename" based on the provider
+  static getResourceDir(){
+    let base = this.convertChromeURIToFileURI('chrome://userchrome/content/');
+    return FileSystemResult.fromDirectory(base.QueryInterface(Ci.nsIFileURL).file.parent)
+  }
+  
+  static getScriptDir(){
+    let base = this.convertChromeURIToFileURI('chrome://userscripts/content/');
+    return FileSystemResult.fromDirectory(base.QueryInterface(Ci.nsIFileURL).file.parent)
+  }
+  
+  static getStyleDir(){
+    let base = this.convertChromeURIToFileURI('chrome://userstyles/skin/');
+    return FileSystemResult.fromDirectory(base.QueryInterface(Ci.nsIFileURL).file.parent)
   }
   
   static #getEntry(aFilename, baseDirectory){
@@ -56,6 +80,15 @@ export class FileSystem{
   }
   
   static getEntry(aFilename, options = {}){
+    if(aFilename instanceof Ci.nsIURI){
+      if(aFilename.scheme === "chrome"){
+        return FileSystemResult.fromNsIFile(this.convertChromeURIToFileURI(aFilename).QueryInterface(Ci.nsIFileURL).file)
+      }
+      if(aFilename.scheme === "file"){
+        return FileSystemResult.fromNsIFile(aFilename.QueryInterface(Ci.nsIFileURL).file)
+      }
+      throw new Error("unsupported nsIURI conversion")
+    }
     return this.#getEntry(aFilename, options.baseDirectory || this.RESOURCE_DIR)
   }
   

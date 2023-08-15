@@ -244,17 +244,14 @@ function updateStyleSheet(name, type) {
     return all
   }
   
-  let sheets = recentWindow.InspectorUtils.getAllStyleSheets(recentWindow.document,false);
-  
-  sheets = sheets.flatMap( x => recurseImports(x,[x]) );
+  let sheets = recentWindow.InspectorUtils.getAllStyleSheets(recentWindow.document,false).flatMap( x => recurseImports(x,[x]) );
   
   // If a sheet is imported multiple times, then there will be
   // duplicates, because style system does create an object for
   // each instace but that's OK since sheets.find below will
   // only find the first instance and reload that which is
   // "probably" fine.
-  //let entryFilePath = `file:///${fsResult.entry().path.replaceAll("\\","/")}`;
-  //const entryFilePath = fsResult.fileURI;
+
   let target = sheets.find(sheet => sheet.href === fsResult.fileURI);
   if(target){
     recentWindow.InspectorUtils.parseStyleSheet(target,fsResult.readSync());
@@ -310,7 +307,7 @@ export class ScriptInfo{
     this.isEnabled = enabled
   }
   asFile(){
-    return FS.getEntry(this.filename,{baseDirectory: FS.SCRIPT_DIR});
+    return FS.getEntry(FS.convertChromeURIToFileURI(this.chromeURI)).entry()
   }
   static fromScript(aScript, isEnabled){
     let info = new ScriptInfo(isEnabled);
@@ -455,7 +452,10 @@ export class _ucUtils{
     return true
   }
   static openScriptDir(){
-    return FS.getEntry("",{baseDirectory: FS.SCRIPT_DIR}).showInFileManager()
+    return FS.getScriptDir().showInFileManager()
+  }
+  static openStyleDir(){
+    return FS.getStyleDir().showInFileManager()
   }
   static parseStringAsScriptInfo(aName, aString){
     return ScriptInfo.fromString(aName, FS.StringContent({content: aString}))

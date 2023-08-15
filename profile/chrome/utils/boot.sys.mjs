@@ -125,7 +125,7 @@ class ScriptData {
       return aScript.#preCompiling
     }
     aScript.#preCompiling = new Promise( resolve => {
-      ChromeUtils.compileScript(`data:,"use strict";import("chrome://userscripts/content/${aScript.filename}").catch(console.error)`)
+      ChromeUtils.compileScript(`data:,"use strict";import("${aScript.chromeURI.spec}").catch(console.error)`)
       .then( script => {
         aScript.#preCompiledESM = script;
         resolve(script);
@@ -208,7 +208,7 @@ class ScriptData {
   static injectClassicScriptIntoGlobal(aScript,aGlobal){
     try{
       Services.scriptloader.loadSubScriptWithOptions(
-        `chrome://userscripts/content/${aScript.filename}`,
+        aScript.chromeURI.spec,
         {
           target: aGlobal,
           ignoreCache: aScript.ignoreCache
@@ -226,7 +226,7 @@ class ScriptData {
     if(aScript.#isRunning){
       return
     }
-    let cmanifest = FS.getEntry(`${aScript.manifest}.manifest`, {baseDirectory: FS.SCRIPT_DIR});
+    let cmanifest = FS.getEntry(FS.convertChromeURIToFileURI(`chrome://userscripts/content/${aScript.manifest}`))
     if(cmanifest.isFile()){
       Components.manager
       .QueryInterface(Ci.nsIComponentRegistrar).autoRegister(cmanifest.entry());
@@ -376,17 +376,16 @@ class UserChrome_js{
     this.GBROWSERHACK_ENABLED = gBrowserHackRequired|gBrowserHackEnabled;
     const disabledScripts = getDisabledScripts();
     // load script data
-    for(let entry of FS.getEntry('',{baseDirectory: FS.SCRIPT_DIR})){
+    for(let entry of FS.getScriptDir()){
       if (/^[A-Za-z0-9]+.*(\.uc\.js|\.uc\.mjs|\.sys\.mjs)$/i.test(entry.leafName)) {
         let script = ScriptData.fromScriptFile(entry);
         this.registerScript(script,!disabledScripts.includes(script.filename));
         if(script.inbackground){
           try{
-            const fileName = `chrome://userscripts/content/${script.filename}`;
             if(script.isESM){
-              ChromeUtils.importESModule( fileName );
+              ChromeUtils.importESModule( script.chromeURI.spec );
             }else{
-              ChromeUtils.import( fileName );
+              ChromeUtils.import( script.chromeURI.spec );
             }
             ScriptData.markScriptRunning(script,null);
           }catch(ex){
@@ -399,7 +398,7 @@ class UserChrome_js{
       }
     }
     let agentStyleSet = new Set();
-    for(let entry of FS.getEntry('',{baseDirectory: FS.STYLE_DIR})){
+    for(let entry of FS.getStyleDir()){
       if (/^[A-Za-z0-9]+.*\.uc\.css$/i.test(entry.leafName)) {
         let style = ScriptData.fromStyleFile(entry);
         this.registerScript(style,!disabledScripts.includes(style.filename));
