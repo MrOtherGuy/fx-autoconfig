@@ -58,9 +58,6 @@ export class FileSystem{
     for(let part of pathParts){
       entry.append(part)
     }
-    if(!entry.exists()){
-      return FileSystemResult.fromErrorKind(FileSystem.ERROR_KIND_NOT_EXIST)
-    }
     return FileSystemResult.fromNsIFile(entry)
   }
   
@@ -198,7 +195,7 @@ export class FileSystem{
   static ERROR_KIND_UNKNOWN_RESULT = 5;
   static ERROR_KIND_INVALID_ARGUMENT = 6;
   static ERROR_KIND_NOT_READABLE = 7;
-  static ERROR_KIDN_NOT_ALLOWED = 8;
+  static ERROR_KIND_NOT_ALLOWED = 8;
 }
 
 class ResultError extends Error{
@@ -209,21 +206,22 @@ class ResultError extends Error{
     this.name = "ResultError";
   }
   static toMessage(kind,info){
+    const strInfo = this.parseInfo(info);
     switch(kind){
       case FileSystem.ERROR_KIND_NOT_EXIST:
-        return "Entry doesn't exist"
+        return `Entry doesn't exist: ${strInfo}`
       case FileSystem.ERROR_KIND_NOT_DIRECTORY:
-        return "Result is not a directory"
+        return `Result is not a directory: ${strInfo}`
       case FileSystem.ERROR_KIND_NOT_FILE:
-        return "Result is not a file"
+        return `Result is not a file: ${strInfo}`
       case FileSystem.ERROR_KIND_NOT_CONTENT:
-        return "Result is not content"
+        return `Result is not content: ${strInfo}`
       case FileSystem.ERROR_KIND_UNKNOWN_RESULT:
-        return "Unknown result type: " + this.parseInfo(info)
+        return `Unknown result type: ${strInfo}`
       case FileSystem.ERROR_KIND_INVALID_ARGUMENT:
-        return "Invalid argument: " + this.parseInfo(info)
+        return `Invalid argument: ${strInfo}`
       case FileSystem.ERROR_KIND_NOT_READABLE:
-        return "File stream is not readable: " + this.parseInfo(info)
+        return `File stream is not readable: ${strInfo}`
       case FileSystem.ERROR_KIND_NOT_ALLOWED:
         return "Writing outside of resources directory is not allowed"
       default:
@@ -234,7 +232,9 @@ class ResultError extends Error{
     return Object.entries(aInfo).map(a => `${a[0]}: ${a[1]}`).join("; ")
   }
   static fromKind(aKind,info){
-    return new ResultError(aKind,{},info)
+    return info instanceof ResultError
+      ? info
+      : new ResultError(aKind,{},info)
   }
 }
 
@@ -262,7 +262,7 @@ class FileSystemResult{
           ? this.#result.content.replace(/\r\n?/g, '\n')
           : this.#result.content
     }
-    throw ResultError.fromKind(FileSystem.ERROR_KIND_NOT_CONTENT,this.#type.description)
+    throw ResultError.fromKind(FileSystem.ERROR_KIND_NOT_CONTENT,{type:this.#type.description})
   }
   get size(){
     return this.isContent()
@@ -273,7 +273,7 @@ class FileSystemResult{
     if(this.isDirectory() || this.isFile()){
       return this.#result
     }
-    throw ResultError.fromKind(FileSystem.ERROR_KIND_NOT_EXIST)
+    throw ResultError.fromKind(FileSystem.ERROR_KIND_NOT_EXIST,FileSystemResult.#generateErrorInfo(this))
   }
   error(){
     return this.isError()
@@ -282,13 +282,13 @@ class FileSystemResult{
   }
   readSync(){
     if(!this.isFile()){
-      throw ResultError.fromKind(FileSystem.ERROR_KIND_NOT_FILE)
+      throw ResultError.fromKind(FileSystem.ERROR_KIND_NOT_FILE,FileSystemResult.#generateErrorInfo(this))
     }
     return FileSystem.readFileSync(this.#result).content()
   }
   read(){
     if(!this.isFile()){
-      return Promise.reject(ResultError.fromKind(FileSystem.ERROR_KIND_NOT_FILE))
+      return Promise.reject(ResultError.fromKind(FileSystem.ERROR_KIND_NOT_FILE,FileSystemResult.#generateErrorInfo(this)))
     }
     return IOUtils.readUTF8(this.#result.path)
   }
@@ -317,7 +317,7 @@ class FileSystemResult{
   };
   entries(){
     if(!this.isDirectory()){
-      throw ResultError.fromKind(FileSystem.ERROR_KIND_NOT_DIRECTORY)
+      throw ResultError.fromKind(FileSystem.ERROR_KIND_NOT_DIRECTORY,FileSystemResult.#generateErrorInfo(this))
     }
     let enumerator = this.#result.directoryEntries.QueryInterface(Ci.nsISimpleEnumerator);
     return {
@@ -349,6 +349,16 @@ class FileSystemResult{
     }
     return false 
   }
+  static #generateErrorInfo(aResult){
+    if(aResult.isError()){
+      return aResult.#result
+    }
+    return {
+      topic: aResult.isContent()
+        ? aResult.#result.path
+        : aResult.#result.leafName
+      }
+  }
   static #getFileURI(aResult){
     if(aResult.isContent()){
       return aResult.#result.path
@@ -364,21 +374,21 @@ class FileSystemResult{
   static fromError(aKind,aErrorDescription){
     return new FileSystemResult(new ResultError(aKind, aErrorDescription), FileSystem.RESULT_ERROR)
   }
-  static fromErrorKind(aKind){
-    return new FileSystemResult(ResultError.fromKind(aKind), FileSystem.RESULT_ERROR)
+  static fromErrorKind(aKind,aErrorDescription){
+    return new FileSystemResult(ResultError.fromKind(aKind,aErrorDescription), FileSystem.RESULT_ERROR)
   }
   static fromFile(file){
     return new FileSystemResult(file, FileSystem.RESULT_FILE)
   }
   static fromNsIFile(entry){
     if(!entry.exists()){
-      return FileSystemResult.fromError(ResultError.fromKind(FileSystem.ERROR_KIND_NOT_EXIST))
+      return FileSystemResult.fromErrorKind(FileSystem.ERROR_KIND_NOT_EXIST,{topic: entry.leafName})
     }
     if(entry.isDirectory()){
       return FileSystemResult.fromDirectory(entry)
     }else if(entry.isFile()){
       return FileSystemResult.fromFile(entry)
     }
-    return FileSystemResult.fromError(ResultError.fromKind(FileSystem.ERROR_KIND_UNKNOWN_RESULT))
+    return FileSystemResult.fromErrorKind(FileSystem.ERROR_KIND_UNKNOWN_RESULT,{topic: entry.leafName})
   }
 }
