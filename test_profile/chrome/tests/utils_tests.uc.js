@@ -373,13 +373,13 @@ Above line is also left empty
   // Test getting correct chromeURI via ScriptInfo for styles
   new Test(
     "getStyleInfoChromeURI",
-    () => _ucUtils.getStyleData("author_style.uc.css").chromeURI
+    () => _ucUtils.getStyleData("author_style.uc.css")?.chromeURI
   ).expect("chrome://userstyles/skin/author_style.uc.css"),
   
   // Test if ScriptInfo can be converted to nsIFile
   new Test(
     "ScriptInfoConvertedToNsIFile",
-    () => _ucUtils.getStyleData("author_style.uc.css").asFile().exists()
+    () => _ucUtils.getStyleData("author_style.uc.css")?.asFile().exists()
   ).expect(true),
   
   // test single-line script descriptions

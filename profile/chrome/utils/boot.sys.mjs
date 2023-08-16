@@ -376,44 +376,51 @@ class UserChrome_js{
     this.GBROWSERHACK_ENABLED = gBrowserHackRequired|gBrowserHackEnabled;
     const disabledScripts = getDisabledScripts();
     // load script data
-    for(let entry of FS.getScriptDir()){
-      if (/^[A-Za-z0-9]+.*(\.uc\.js|\.uc\.mjs|\.sys\.mjs)$/i.test(entry.leafName)) {
-        let script = ScriptData.fromScriptFile(entry);
-        this.registerScript(script,!disabledScripts.includes(script.filename));
-        if(script.inbackground){
-          try{
-            if(script.isESM){
-              ChromeUtils.importESModule( script.chromeURI.spec );
-            }else{
-              ChromeUtils.import( script.chromeURI.spec );
+    const scriptDir = FS.getScriptDir();
+    if(scriptDir.isDirectory()){
+      for(let entry of scriptDir){
+        if (/^[A-Za-z0-9]+.*(\.uc\.js|\.uc\.mjs|\.sys\.mjs)$/i.test(entry.leafName)) {
+          let script = ScriptData.fromScriptFile(entry);
+          this.registerScript(script,!disabledScripts.includes(script.filename));
+          if(script.inbackground){
+            try{
+              if(script.isESM){
+                ChromeUtils.importESModule( script.chromeURI.spec );
+              }else{
+                ChromeUtils.import( script.chromeURI.spec );
+              }
+              ScriptData.markScriptRunning(script,null);
+            }catch(ex){
+              console.error(new Error(`@ ${script.filename}`,{cause:ex}));
             }
-            ScriptData.markScriptRunning(script,null);
-          }catch(ex){
-            console.error(new Error(`@ ${script.filename}`,{cause:ex}));
+          }
+          if(script.isESM && !script.inbackground){
+            ScriptData.preCompileMJS(script);
           }
         }
-        if(script.isESM && !script.inbackground){
-          ScriptData.preCompileMJS(script);
-        }
       }
     }
-    let agentStyleSet = new Set();
-    for(let entry of FS.getStyleDir()){
-      if (/^[A-Za-z0-9]+.*\.uc\.css$/i.test(entry.leafName)) {
-        let style = ScriptData.fromStyleFile(entry);
-        this.registerScript(style,!disabledScripts.includes(style.filename));
-        if(style.styleSheetMode === "agent"){
-          agentStyleSet.add(style);
+    const styleDir = FS.getStyleDir();
+    if(styleDir.isDirectory()){
+      let agentStyleSet = new Set();
+      for(let entry of styleDir){
+        if (/^[A-Za-z0-9]+.*\.uc\.css$/i.test(entry.leafName)) {
+          let style = ScriptData.fromStyleFile(entry);
+          this.registerScript(style,!disabledScripts.includes(style.filename));
+          if(style.styleSheetMode === "agent"){
+            agentStyleSet.add(style);
+          }
         }
       }
-    }
-    if(agentStyleSet.size > 0){
-      this.addAgentStyles(agentStyleSet);
-      agentStyleSet.clear();
+      if(agentStyleSet.size > 0){
+        this.addAgentStyles(agentStyleSet);
+        agentStyleSet.clear();
+      }
     }
     this.scripts.sort((a,b) => a.loadOrder - b.loadOrder);
     Services.obs.addObserver(this, 'domwindowopened', false);
     this.initialized = true;
+
   }
   addAgentStyles(agentStyles){
     let sss = Cc['@mozilla.org/content/style-sheet-service;1'].getService(Ci.nsIStyleSheetService);

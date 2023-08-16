@@ -371,6 +371,9 @@ class FileSystemResult{
     return new FileSystemResult(file, FileSystem.RESULT_FILE)
   }
   static fromNsIFile(entry){
+    if(!entry.exists()){
+      return FileSystemResult.fromError(ResultError.fromKind(FileSystem.ERROR_KIND_NOT_EXIST))
+    }
     if(entry.isDirectory()){
       return FileSystemResult.fromDirectory(entry)
     }else if(entry.isFile()){
