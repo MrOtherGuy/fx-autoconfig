@@ -245,9 +245,10 @@ class ScriptData {
   static fromScriptFile(aFile){
     if(aFile.fileSize < 24){
       // Smaller files can't possibly have a valid header
+      // This also means that we successfully generate a ScriptData for *folders* named "xx.uc.js"...
       return new ScriptData(aFile.leafName,"",aFile.fileSize === 0,false)
     }
-    const result = FS.readFileSync(aFile,{ metaOnly: true });
+    const result = FS.readNSIFileSyncUncheckedWithOptions(aFile,{ metaOnly: true });
     const headerText = this.extractScriptHeader(result);
     // If there are less than 2 bytes after the header then we mark the script as non-executable. This means that if the file only has a header then we don't try to inject it to any windows, since it wouldn't do anything.
     return new ScriptData(aFile.leafName, headerText, headerText.length > aFile.fileSize - 2,false);
@@ -257,7 +258,7 @@ class ScriptData {
       // Smaller files can't possibly have a valid header
       return new ScriptData(aFile.leafName,"",true,true)
     }
-    const result = FS.readFileSync(aFile,{ metaOnly: true });
+    const result = FS.readNSIFileSyncUncheckedWithOptions(aFile,{ metaOnly: true });
     return new ScriptData(aFile.leafName, this.extractStyleHeader(result), true,true);
   }
 }

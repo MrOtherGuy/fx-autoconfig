@@ -49,7 +49,7 @@ export class FileSystem{
   
   static #getEntry(aFilename, baseDirectory){
     if(typeof aFilename !== "string"){
-      return FileSystemResult.fromErrorKind(FileSystem.ERROR_KIND_INVALID_ARGUMENT,"String");
+      return FileSystemResult.fromErrorKind(FileSystem.ERROR_KIND_INVALID_ARGUMENT,{expected:"String"});
     }
     const filename = aFilename.replace("\\","/");
     let pathParts = ((filename.startsWith("..") ? "" : baseDirectory) + "/" + filename).split("/").filter( (a) => (!!a && a != "..") );
@@ -73,22 +73,7 @@ export class FileSystem{
     }
     return this.#getEntry(aFilename, options.baseDirectory || this.RESOURCE_DIR)
   }
-  
-  static readFileSync(aFile, options = {}) {
-    if(typeof aFile === "string"){
-      const fsResult = this.#getEntry(aFile, this.RESOURCE_DIR);
-      if(fsResult.isError()){
-        return fsResult
-      }
-      if(fsResult.isFile()){
-        aFile = fsResult.entry();
-      }else{
-        return FileSystemResult.fromErrorKind(this.ERROR_KIND_NOT_FILE)
-      }
-    }else if(!(aFile instanceof Ci.nsIFile && aFile.exists() && aFile.isFile())){
-      return FileSystemResult.fromErrorKind(this.ERROR_KIND_NOT_FILE)
-    }
-    // aFile should now be nsIFile mapping to a file
+  static readNSIFileSyncUncheckedWithOptions(aFile,options){
     let stream = Cc['@mozilla.org/network/file-input-stream;1'].createInstance(Ci.nsIFileInputStream);
     let cvstream = Cc['@mozilla.org/intl/converter-input-stream;1'].createInstance(Ci.nsIConverterInputStream);
     try{
@@ -98,7 +83,7 @@ export class FileSystem{
       console.error(e);
       cvstream.close();
       stream.close();
-      return FileSystemResult.fromError(this.ERROR_KIND_NOT_READABLE,{cause: e},{filename: aFile.leafName})
+      return FileSystemResult.fromErrorKind(this.ERROR_KIND_NOT_READABLE,{cause: e, filename: aFile.leafName})
     }
     let rv = {content:'',path: this.getFileURIForFile(aFile,this.RESULT_FILE)};
     let data = {};
@@ -113,6 +98,21 @@ export class FileSystem{
     stream.close();
     
     return FileSystemResult.fromContent(rv)
+  }
+  static readFileSync(aFile, options = {}) {
+    if(typeof aFile === "string"){
+      const fsResult = this.#getEntry(aFile, this.RESOURCE_DIR);
+      if(fsResult.isFile()){
+        return this.readNSIFileSyncUncheckedWithOptions(fsResult.entry(),options);
+      }
+      return fsResult.isError()
+        ? fsResult
+        : FileSystemResult.fromErrorKind(this.ERROR_KIND_NOT_FILE,{topic: aFile})
+    }
+    if(aFile instanceof Ci.nsIFile){
+      return this.readNSIFileSyncUncheckedWithOptions(aFile,options);
+    }
+    throw ResultError.fromKind(this.ERROR_KIND_INVALID_ARGUMENT,{expected: "string | Ci.nsIFile"})
   }
   static convertResourceRelativeURI(aPath){
     let base = ["chrome",this.RESOURCE_DIR];
@@ -132,8 +132,8 @@ export class FileSystem{
       let path = this.convertResourceRelativeURI(aPath);
       return FileSystemResult.fromContent({ content: await IOUtils.readUTF8(path), path: PathUtils.toFileURI(path) })
     }catch(ex){
-      console.error(ex)
-      return FileSystemResult.fromError(this.ERROR_KIND_NOT_READABLE,{cause: ex})
+      console.error(ex);
+      return FileSystemResult.fromErrorKind(this.ERROR_KIND_NOT_READABLE,{cause: ex})
     }
   }  
   static async readJSON(path){
@@ -284,7 +284,7 @@ class FileSystemResult{
     if(!this.isFile()){
       throw ResultError.fromKind(FileSystem.ERROR_KIND_NOT_FILE,FileSystemResult.#generateErrorInfo(this))
     }
-    return FileSystem.readFileSync(this.#result).content()
+    return FileSystem.readNSIFileSyncUncheckedWithOptions(this.#result,{}).content()
   }
   read(){
     if(!this.isFile()){
@@ -370,9 +370,6 @@ class FileSystemResult{
   }
   static fromContent(content){
     return new FileSystemResult(content, FileSystem.RESULT_CONTENT)
-  }
-  static fromError(aKind,aErrorDescription){
-    return new FileSystemResult(new ResultError(aKind, aErrorDescription), FileSystem.RESULT_ERROR)
   }
   static fromErrorKind(aKind,aErrorDescription){
     return new FileSystemResult(ResultError.fromKind(aKind,aErrorDescription), FileSystem.RESULT_ERROR)

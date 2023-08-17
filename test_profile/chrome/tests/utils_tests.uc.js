@@ -276,6 +276,18 @@ Above line is also left empty
     }
   ).expect("test_profile/chrome/resources/test.txt"),
   
+  // Check that correct error kind for non-existing entry
+  new Test(
+    "getNonExistingFSEntry",
+    () => { return _ucUtils.fs.getEntry("nonexistent.txt").error().kind }
+  ).expect(_ucUtils.fs.ERROR_KIND_NOT_EXIST),
+  
+  // Try to get file entry with invalid argument
+  new Test(
+    "expectError_getFSEntryWithInvalidArgument",
+    () => { return _ucUtils.fs.readFileSync([]) }
+  ).expectError(),
+  
   // return list of script names in directory (not file names)
   // Note: aaa_test_script.uc.js does not have a name so it should be first
   new Test(
