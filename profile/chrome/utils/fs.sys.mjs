@@ -24,41 +24,70 @@ export class FileSystem{
         : Services.io.newURI(aURI)
     );
   }
-
+  // Call to .parent is needed because chrome urls get implicit "filename" based on the provider
+  static #SCRIPT_URI;
+  static #STYLE_URI;
+  static #RESOURCE_URI;
   static{
-    this.RESOURCE_DIR = this.convertChromeURIToFileURI('chrome://userchrome/content/')
-    .QueryInterface(Ci.nsIFileURL).file.parent.leafName;
-    this.BASE_FILEURI = this.getFileURIForFile(Services.dirsvc.get('UChrm',Ci.nsIFile),this.RESULT_DIRECTORY);
+    this.#RESOURCE_URI = this.getFileURIForFile(
+      this.convertChromeURIToFileURI('chrome://userchrome/content/')
+      .QueryInterface(Ci.nsIFileURL).file.parent,
+      FileSystem.RESULT_DIRECTORY
+    );
+    this.#SCRIPT_URI = this.getFileURIForFile(
+      this.convertChromeURIToFileURI('chrome://userscripts/content/')
+      .QueryInterface(Ci.nsIFileURL).file.parent,
+      FileSystem.RESULT_DIRECTORY
+    );
+    this.#STYLE_URI = this.getFileURIForFile(
+      this.convertChromeURIToFileURI('chrome://userstyles/skin/')
+      .QueryInterface(Ci.nsIFileURL).file.parent,
+      FileSystem.RESULT_DIRECTORY
+    );
   }
   
-  // All these call to .parent because chrome urls get implicit "filename" based on the provider
+  static get SCRIPT_URI(){
+    return Services.io.newURI(FileSystem.#SCRIPT_URI)
+  }
+  
+  static get STYLE_URI(){
+    return Services.io.newURI(FileSystem.#STYLE_URI)
+  } 
+  
+  static get RESOURCE_URI(){
+    return Services.io.newURI(FileSystem.#RESOURCE_URI)
+  } 
+  
   static getResourceDir(){
-    let base = this.convertChromeURIToFileURI('chrome://userchrome/content/');
-    return FileSystemResult.fromNsIFile(base.QueryInterface(Ci.nsIFileURL).file.parent)
+    return FileSystemResult.fromNsIFile(FileSystem.RESOURCE_URI.QueryInterface(Ci.nsIFileURL).file)
   }
   
   static getScriptDir(){
-    let base = this.convertChromeURIToFileURI('chrome://userscripts/content/');
-    return FileSystemResult.fromNsIFile(base.QueryInterface(Ci.nsIFileURL).file.parent)
+    return FileSystemResult.fromNsIFile(FileSystem.SCRIPT_URI.QueryInterface(Ci.nsIFileURL).file)
   }
   
   static getStyleDir(){
-    let base = this.convertChromeURIToFileURI('chrome://userstyles/skin/');
-    return FileSystemResult.fromNsIFile(base.QueryInterface(Ci.nsIFileURL).file.parent)
+    return FileSystemResult.fromNsIFile(FileSystem.STYLE_URI.QueryInterface(Ci.nsIFileURL).file)
   }
   
-  static #getEntry(aFilename, baseDirectory){
+  static #getEntryFromString(aFilename, baseFileURI){
+    let baseDirectory = baseFileURI.QueryInterface(Ci.nsIFileURL).file;
     if(typeof aFilename !== "string"){
       return FileSystemResult.fromErrorKind(FileSystem.ERROR_KIND_INVALID_ARGUMENT,{expected:"String"});
     }
-    const filename = aFilename.replace("\\","/");
-    let pathParts = ((filename.startsWith("..") ? "" : baseDirectory) + "/" + filename).split("/").filter( (a) => (!!a && a != "..") );
-    let entry = Services.dirsvc.get('UChrm',Ci.nsIFile);
-    
-    for(let part of pathParts){
-      entry.append(part)
+    const parts = aFilename.replace("\\","/").split("/").filter(a => a.length > 0);
+    while(parts[0] === ".."){
+      baseDirectory = baseDirectory.parent;
+      parts.shift();
     }
-    return FileSystemResult.fromNsIFile(entry)
+    try{
+      for(let part of parts){
+        baseDirectory.append(part)
+      }
+    }catch(ex){
+      return FileSystemResult.fromErrorKind(FileSystem.ERROR_KIND_INVALID_ARGUMENT,{type:"Invalid path"})
+    }
+    return FileSystemResult.fromNsIFile(baseDirectory)
   }
   
   static getEntry(aFilename, options = {}){
@@ -71,7 +100,7 @@ export class FileSystem{
       }
       throw new Error("unsupported nsIURI conversion")
     }
-    return this.#getEntry(aFilename, options.baseDirectory || this.RESOURCE_DIR)
+    return FileSystem.#getEntryFromString(aFilename, options.baseDirectory || FileSystem.RESOURCE_URI)
   }
   static readNSIFileSyncUncheckedWithOptions(aFile,options){
     let stream = Cc['@mozilla.org/network/file-input-stream;1'].createInstance(Ci.nsIFileInputStream);
@@ -101,7 +130,7 @@ export class FileSystem{
   }
   static readFileSync(aFile, options = {}) {
     if(typeof aFile === "string"){
-      const fsResult = this.#getEntry(aFile, this.RESOURCE_DIR);
+      const fsResult = this.#getEntryFromString(aFile, FileSystem.RESOURCE_URI);
       if(fsResult.isFile()){
         return this.readNSIFileSyncUncheckedWithOptions(fsResult.entry(),options);
       }
@@ -114,25 +143,14 @@ export class FileSystem{
     }
     throw ResultError.fromKind(this.ERROR_KIND_INVALID_ARGUMENT,{expected: "string | Ci.nsIFile"})
   }
-  static convertResourceRelativeURI(aPath){
-    let base = ["chrome",this.RESOURCE_DIR];
-    let parts = aPath.split(/[\\\/]/);
-    while(parts[0] === ".."){
-      base.pop();
-      parts.shift();
-    }
-    let path = PathUtils.join(this.PROFILE_DIR, ...base.concat(parts));
-    return path
-  }
   static async readFile(aPath){
     if(typeof aPath !== "string"){
       throw ResultError.fromKind(this.ERROR_KIND_INVALID_ARGUMENT,{expected: "string"})
     }
     try{
-      let path = this.convertResourceRelativeURI(aPath);
+      let path = FileSystem.#appendToBaseURI(aPath);
       return FileSystemResult.fromContent({ content: await IOUtils.readUTF8(path), path: PathUtils.toFileURI(path) })
     }catch(ex){
-      console.error(ex);
       return FileSystemResult.fromErrorKind(this.ERROR_KIND_NOT_READABLE,{cause: ex})
     }
   }  
@@ -146,7 +164,24 @@ export class FileSystem{
       console.error(ex)
     }
     return null
-  }  
+  }
+  static #appendToBaseURI(aPath,aFileURI){
+    // Normally, this API can only write into resources directory
+    // Writing outside of resources can be enabled using following pref
+    const disallowUnsafeWrites = !Services.prefs.getBoolPref("userChromeJS.allowUnsafeWrites");
+    
+    const baseURI = aFileURI || FileSystem.RESOURCE_URI;
+    let baseParts = PathUtils.split(baseURI.QueryInterface(Ci.nsIFileURL).file.path);
+    let pathParts = aPath.split(/[\\\/]/);
+    while(pathParts[0] === ".."){
+      baseParts.pop();
+      pathParts.shift();
+      if(disallowUnsafeWrites){
+        throw ResultError.fromKind(this.ERROR_KIND_NOT_ALLOWED)
+      }
+    }
+    return PathUtils.join(...baseParts.concat(pathParts))
+  }
   static async writeFile(path, content, options = {}){
     if(!path || typeof path !== "string"){
       throw ResultError.fromKind(this.ERROR_KIND_INVALID_ARGUMENT,{expected: "string"})
@@ -154,27 +189,14 @@ export class FileSystem{
     if(typeof content !== "string"){
       throw ResultError.fromKind(this.ERROR_KIND_INVALID_ARGUMENT,{expected: "string"})
     }
-
-    let base = ["chrome",this.RESOURCE_DIR];
-    let parts = path.split(/[\\\/]/);
-    
-    // Normally, this API can only write into resources directory
-    // Writing outside of resources can be enabled using following pref
-    const disallowUnsafeWrites = !Services.prefs.getBoolPref("userChromeJS.allowUnsafeWrites");
-
-    while(parts[0] === ".."){
-      if(disallowUnsafeWrites){
-        throw ResultError.fromKind(this.ERROR_KIND_NOT_ALLOWED)
-      }
-      base.pop();
-      parts.shift();
-    }
-    const fileName = PathUtils.join( this.PROFILE_DIR, ...base.concat(parts) );
-    
+    const fileName = FileSystem.#appendToBaseURI(path);
     if(!options.tmpPath){
       options.tmpPath = fileName + ".tmp";
     }
     return IOUtils.writeUTF8( fileName, content, options );
+    /*const fileName = PathUtils.join( this.PROFILE_DIR, ...base.concat(parts) );
+    
+    return IOUtils.writeUTF8( fileName, content, options );*/
   }
   static createFileURI(fileName){
     if(!fileName){

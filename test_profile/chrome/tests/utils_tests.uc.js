@@ -20,6 +20,7 @@ Above line is also left empty
   
   const BRAND_NAME = "Firefox Nightly";
   const PREF_ALLLOW_UNSAFE = "userChromeJS.allowUnsafeWrites";
+  const RESOURCE_SPEC = _ucUtils.fs.RESOURCE_URI.spec;
   
   const { Test } = ChromeUtils.importESModule("chrome://userscripts/content/000_test_runner.sys.mjs");
   
@@ -243,7 +244,7 @@ Above line is also left empty
   new Test(
     "getFileURIFromFile",
     () => { return _ucUtils.fs.getEntry("test_file.txt").fileURI }
-  ).expect(`${_ucUtils.fs.BASE_FILEURI}resources/test_file.txt`),
+  ).expect(`${RESOURCE_SPEC}test_file.txt`),
     
   new Test(
     "getFileURIFromContent",
@@ -253,14 +254,14 @@ Above line is also left empty
         .then(result => resolve(result.fileURI))
       })
     }
-  ).expectAsync(`${_ucUtils.fs.BASE_FILEURI}resources/test_file.txt`),
+  ).expectAsync(`${RESOURCE_SPEC}test_file.txt`),
     
   new Test(
     "getFileURIFromContentSync",
     () => {
       return _ucUtils.fs.readFileSync("test_file.txt").fileURI
     }
-  ).expect(`${_ucUtils.fs.BASE_FILEURI}resources/test_file.txt`),
+  ).expect(`${RESOURCE_SPEC}test_file.txt`),
   
   new Test(
     "createEmptyFileURI",
