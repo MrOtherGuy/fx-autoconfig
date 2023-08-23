@@ -67,6 +67,7 @@ class ScriptData {
       ? headerText.match(/\/\/ @stylemode\s+(.+)\s*$/im)?.[1] === "agent_sheet"
         ? "agent" : "author"
       : null;
+    this.useFileURI = /\/\/ @usefileuri\b/.test(headerText);
     this.noExec = isStyle || noExec;
     // Construct regular expression to use to match target document
     let match, rex = {
@@ -111,6 +112,11 @@ class ScriptData {
     }
     return this.#chromeURI
   }
+  get referenceURI(){
+    return this.useFileURI && this.type === "style"
+      ? FS.convertChromeURIToFileURI(this.chromeURI)
+      : this.chromeURI
+  }
   get preLoadedStyle(){
     return this.#preLoadedStyle
   }
@@ -148,7 +154,7 @@ class ScriptData {
     let sss = Cc['@mozilla.org/content/style-sheet-service;1'].getService(Ci.nsIStyleSheetService);
     try{
       // Try to preload the file and store it
-      aStyle.#preLoadedStyle = sss.preloadSheet(aStyle.chromeURI, sss.AUTHOR_SHEET);
+      aStyle.#preLoadedStyle = sss.preloadSheet(aStyle.referenceURI, sss.AUTHOR_SHEET);
     }catch(e){
       console.error(`Could not pre-load ${aStyle.filename}: ${e.name}`)
       return false
@@ -403,20 +409,13 @@ class UserChrome_js{
     }
     const styleDir = FS.getStyleDir();
     if(styleDir.isDirectory()){
-      let agentStyleSet = new Set();
       for(let entry of styleDir){
         if (/^[A-Za-z0-9]+.*\.uc\.css$/i.test(entry.leafName)) {
           let style = ScriptData.fromStyleFile(entry);
           this.registerScript(style,!disabledScripts.includes(style.filename));
-          if(style.styleSheetMode === "agent"){
-            agentStyleSet.add(style);
-          }
         }
       }
-      if(agentStyleSet.size > 0){
-        this.addAgentStyles(agentStyleSet);
-        agentStyleSet.clear();
-      }
+      this.addAgentStyles(this.styles.filter(style => style.styleSheetMode === "agent"));
     }
     this.scripts.sort((a,b) => a.loadOrder - b.loadOrder);
     Services.obs.addObserver(this, 'domwindowopened', false);
@@ -424,14 +423,15 @@ class UserChrome_js{
 
   }
   addAgentStyles(agentStyles){
-    let sss = Cc['@mozilla.org/content/style-sheet-service;1'].getService(Ci.nsIStyleSheetService);
-    for(let style of agentStyles){
-      try{
-        sss.loadAndRegisterSheet(style.chromeURI, sss.AGENT_SHEET);
-        ScriptData.markScriptRunning(style);
-      }catch(e){
-        console.error(e);
-        console.error(`Could not load ${style.filename}: ${e.name}`);
+    if(agentStyles.length > 0){
+      let sss = Cc['@mozilla.org/content/style-sheet-service;1'].getService(Ci.nsIStyleSheetService);
+      for(let style of agentStyles){
+        try{
+          sss.loadAndRegisterSheet(style.referenceURI, sss.AGENT_SHEET);
+          ScriptData.markScriptRunning(style);
+        }catch(e){
+          console.error(`Could not load ${style.filename}: ${e.name}`);
+        }
       }
     }
   }

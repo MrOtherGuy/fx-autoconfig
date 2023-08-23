@@ -184,7 +184,7 @@ function updateRegisteredStyleSheet(name) {
     return false
   }
   if(matchingStyle.styleSheetMode === "agent"){
-    return reRegisterStyleWithQualifiedURI(matchingStyle.chromeURI,"agent")
+    return reRegisterStyleWithQualifiedURI(matchingStyle.referenceURI,"agent")
   }else{
     let success = loaderModuleLink.scriptDataConstructor.preLoadAuthorStyle(matchingStyle);
     if(success){
@@ -193,7 +193,7 @@ function updateRegisteredStyleSheet(name) {
       while (windows.hasMoreElements()) {
         let win = windows.getNext();
         if(matchingStyle.regex.test(win.location.href)){
-          win.windowUtils.removeSheet(matchingStyle.chromeURI, styleSheetType);
+          win.windowUtils.removeSheet(matchingStyle.referenceURI, styleSheetType);
           win.windowUtils.addSheet(matchingStyle.preLoadedStyle,styleSheetType);
         }
       }
@@ -314,6 +314,7 @@ export class ScriptInfo{
     Object.assign(info,aScript);
     info.regex = new RegExp(aScript.regex.source, aScript.regex.flags);
     info.chromeURI = aScript.chromeURI.spec;
+    info.referenceURI = aScript.referenceURI.spec;
     info.isRunning = aScript.isRunning;
     info.injectionFailed = aScript.injectionFailed;
     return info
