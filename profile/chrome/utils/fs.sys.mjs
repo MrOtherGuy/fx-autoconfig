@@ -6,13 +6,13 @@ export class FileSystem{
 
   static getFileURIForFile(aEntry, type){
     let qi = Services.io.getProtocolHandler('file').QueryInterface(Ci.nsIFileProtocolHandler);
-    if(type === this.RESULT_DIRECTORY){
+    if(type === FileSystem.RESULT_DIRECTORY){
       return qi.getURLSpecFromDir(aEntry)
     }
-    if(type === this.RESULT_FILE){
+    if(type === FileSystem.RESULT_FILE){
       return qi.getURLSpecFromActualFile(aEntry)
     }
-    throw ResultError.fromKind(this.ERROR_KIND_INVALID_ARGUMENT,{expected: "FileSystem.RESULT_FILE | FileSystem.RESULT_DIRECTORY"})
+    throw ResultError.fromKind(FileSystem.ERROR_KIND_INVALID_ARGUMENT,{expected: "FileSystem.RESULT_FILE | FileSystem.RESULT_DIRECTORY"})
   }
   
   static convertChromeURIToFileURI(aURI){
@@ -28,18 +28,18 @@ export class FileSystem{
   static #STYLE_URI;
   static #RESOURCE_URI;
   static{
-    this.#RESOURCE_URI = this.getFileURIForFile(
-      this.convertChromeURIToFileURI('chrome://userchrome/content/')
+    this.#RESOURCE_URI = FileSystem.getFileURIForFile(
+      FileSystem.convertChromeURIToFileURI('chrome://userchrome/content/')
       .QueryInterface(Ci.nsIFileURL).file.parent,
       FileSystem.RESULT_DIRECTORY
     );
-    this.#SCRIPT_URI = this.getFileURIForFile(
-      this.convertChromeURIToFileURI('chrome://userscripts/content/')
+    this.#SCRIPT_URI = FileSystem.getFileURIForFile(
+      FileSystem.convertChromeURIToFileURI('chrome://userscripts/content/')
       .QueryInterface(Ci.nsIFileURL).file.parent,
       FileSystem.RESULT_DIRECTORY
     );
-    this.#STYLE_URI = this.getFileURIForFile(
-      this.convertChromeURIToFileURI('chrome://userstyles/skin/')
+    this.#STYLE_URI = FileSystem.getFileURIForFile(
+      FileSystem.convertChromeURIToFileURI('chrome://userstyles/skin/')
       .QueryInterface(Ci.nsIFileURL).file.parent,
       FileSystem.RESULT_DIRECTORY
     );
@@ -92,7 +92,7 @@ export class FileSystem{
   static getEntry(aFilename, options = {}){
     if(aFilename instanceof Ci.nsIURI){
       if(aFilename.scheme === "chrome"){
-        return FileSystemResult.fromNsIFile(this.convertChromeURIToFileURI(aFilename).QueryInterface(Ci.nsIFileURL).file)
+        return FileSystemResult.fromNsIFile(FileSystem.convertChromeURIToFileURI(aFilename).QueryInterface(Ci.nsIFileURL).file)
       }
       if(aFilename.scheme === "file"){
         return FileSystemResult.fromNsIFile(aFilename.QueryInterface(Ci.nsIFileURL).file)
@@ -111,9 +111,9 @@ export class FileSystem{
       console.error(e);
       cvstream.close();
       stream.close();
-      return FileSystemResult.fromErrorKind(this.ERROR_KIND_NOT_READABLE,{cause: e, filename: aFile.leafName})
+      return FileSystemResult.fromErrorKind(FileSystem.ERROR_KIND_NOT_READABLE,{cause: e, filename: aFile.leafName})
     }
-    let rv = {content:'',path: this.getFileURIForFile(aFile,this.RESULT_FILE)};
+    let rv = {content:'',path: FileSystem.getFileURIForFile(aFile,FileSystem.RESULT_FILE)};
     let data = {};
     const metaOnly = !!options.metaOnly;
     while (cvstream.readString(4096, data)) {
@@ -129,33 +129,33 @@ export class FileSystem{
   }
   static readFileSync(aFile, options = {}) {
     if(typeof aFile === "string"){
-      const fsResult = this.#getEntryFromString(aFile, FileSystem.RESOURCE_URI);
+      const fsResult = FileSystem.#getEntryFromString(aFile, FileSystem.RESOURCE_URI);
       if(fsResult.isFile()){
-        return this.readNSIFileSyncUncheckedWithOptions(fsResult.entry(),options);
+        return FileSystem.readNSIFileSyncUncheckedWithOptions(fsResult.entry(),options);
       }
       return fsResult.isError()
         ? fsResult
-        : FileSystemResult.fromErrorKind(this.ERROR_KIND_NOT_FILE,{topic: aFile})
+        : FileSystemResult.fromErrorKind(FileSystem.ERROR_KIND_NOT_FILE,{topic: aFile})
     }
     if(aFile instanceof Ci.nsIFile){
-      return this.readNSIFileSyncUncheckedWithOptions(aFile,options);
+      return FileSystem.readNSIFileSyncUncheckedWithOptions(aFile,options);
     }
-    throw ResultError.fromKind(this.ERROR_KIND_INVALID_ARGUMENT,{expected: "string | Ci.nsIFile"})
+    throw ResultError.fromKind(FileSystem.ERROR_KIND_INVALID_ARGUMENT,{expected: "string | Ci.nsIFile"})
   }
   static async readFile(aPath){
     if(typeof aPath !== "string"){
-      throw ResultError.fromKind(this.ERROR_KIND_INVALID_ARGUMENT,{expected: "string"})
+      throw ResultError.fromKind(FileSystem.ERROR_KIND_INVALID_ARGUMENT,{expected: "string"})
     }
     try{
       let path = FileSystem.#appendToBaseURI(aPath);
       return FileSystemResult.fromContent({ content: await IOUtils.readUTF8(path), path: PathUtils.toFileURI(path) })
     }catch(ex){
-      return FileSystemResult.fromErrorKind(this.ERROR_KIND_NOT_READABLE,{cause: ex})
+      return FileSystemResult.fromErrorKind(FileSystem.ERROR_KIND_NOT_READABLE,{cause: ex})
     }
   }  
   static async readJSON(path){
     try{
-      let result = await this.readFile(path);
+      let result = await FileSystem.readFile(path);
       return result.isError()
             ? null
             : JSON.parse(result.content())
@@ -176,17 +176,17 @@ export class FileSystem{
       baseParts.pop();
       pathParts.shift();
       if(disallowUnsafeWrites){
-        throw ResultError.fromKind(this.ERROR_KIND_NOT_ALLOWED)
+        throw ResultError.fromKind(FileSystem.ERROR_KIND_NOT_ALLOWED)
       }
     }
     return PathUtils.join(...baseParts.concat(pathParts))
   }
   static async writeFile(path, content, options = {}){
     if(!path || typeof path !== "string"){
-      throw ResultError.fromKind(this.ERROR_KIND_INVALID_ARGUMENT,{expected: "string"})
+      throw ResultError.fromKind(FileSystem.ERROR_KIND_INVALID_ARGUMENT,{expected: "string"})
     }
     if(typeof content !== "string"){
-      throw ResultError.fromKind(this.ERROR_KIND_INVALID_ARGUMENT,{expected: "string"})
+      throw ResultError.fromKind(FileSystem.ERROR_KIND_INVALID_ARGUMENT,{expected: "string"})
     }
     const fileName = FileSystem.#appendToBaseURI(path);
     if(!options.tmpPath){
@@ -196,9 +196,9 @@ export class FileSystem{
   }
   static createFileURI(fileName){
     if(!fileName){
-      return this.getResourceDir().fileURI
+      return FileSystem.getResourceDir().fileURI
     }
-    return this.convertChromeURIToFileURI(`chrome://userchrome/content/${fileName}`).spec
+    return FileSystem.convertChromeURIToFileURI(`chrome://userchrome/content/${fileName}`).spec
   }
   static chromeDir(){
     return FileSystemResult.fromDirectory(Services.dirsvc.get('UChrm',Ci.nsIFile))
@@ -224,7 +224,7 @@ class ResultError extends Error{
     this.name = "ResultError";
   }
   static toMessage(kind,info){
-    const strInfo = this.parseInfo(info);
+    const strInfo = ResultError.parseInfo(info);
     switch(kind){
       case FileSystem.ERROR_KIND_NOT_EXIST:
         return `Entry doesn't exist: ${strInfo}`
