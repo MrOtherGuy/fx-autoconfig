@@ -196,7 +196,7 @@ export class FileSystem{
   }
   static createFileURI(fileName){
     if(!fileName){
-      return FileSystem.getResourceDir().fileURI
+      return FileSystem.#RESOURCE_URI
     }
     return FileSystem.convertChromeURIToFileURI(`chrome://userchrome/content/${fileName}`).spec
   }
