@@ -1,5 +1,4 @@
 export class FileSystem{
-  static PROFILE_DIR = Services.dirsvc.get("ProfD", Ci.nsIFile).path;
   static RESULT_CONTENT = Symbol("Content");
   static RESULT_DIRECTORY = Symbol("Directory");
   static RESULT_ERROR = Symbol("Error");
@@ -194,9 +193,6 @@ export class FileSystem{
       options.tmpPath = fileName + ".tmp";
     }
     return IOUtils.writeUTF8( fileName, content, options );
-    /*const fileName = PathUtils.join( this.PROFILE_DIR, ...base.concat(parts) );
-    
-    return IOUtils.writeUTF8( fileName, content, options );*/
   }
   static createFileURI(fileName){
     if(!fileName){
