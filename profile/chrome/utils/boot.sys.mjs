@@ -418,6 +418,7 @@ class UserChrome_js{
       this.addAgentStyles(this.styles.filter(style => style.styleSheetMode === "agent"));
     }
     this.scripts.sort((a,b) => a.loadOrder - b.loadOrder);
+    this.styles.sort((a,b) => a.loadOrder - b.loadOrder);
     Services.obs.addObserver(this, 'domwindowopened', false);
     this.initialized = true;
 
