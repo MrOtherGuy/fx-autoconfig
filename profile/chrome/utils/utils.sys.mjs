@@ -595,7 +595,9 @@ export class _ucUtils{
       return
     }
     const name = isElement ? el.getAttribute("filename") : el;
-    let script = _ucUtils.getScriptData(name) || _ucUtils.getStyleData(name);
+    let script = name.endsWith("js")
+      ? _ucUtils.getScriptData(name)
+      : _ucUtils.getStyleData(name);
     if(!script){
       return null
     }
