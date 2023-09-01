@@ -842,11 +842,13 @@ Did it provide you with a button to "Enable workaround"? And after restart you g
 Clicking the button sent you here, right? So what is going on here?
 Fear not! Here's what's happening... probably.
 
-In older versions of this loader script, boot.jsm had a hack to make a Firefox internal `gBrowser` object available for your custom scripts. However, said hack is now disabled by default in latest versions of boot.jsm.
+In older versions of this loader script, boot.sys.mjs had a hack to make a Firefox internal `gBrowser` object available for your custom scripts. However, said hack is now disabled by default in latest versions of boot.sys.mjs.
 
-So, if boot.jsm detects that startup has been broken because gBrowser is not available, it will show said banner. Clicking the "Enable workaround"-button will tell boot.jsm to set a pref `userChromeJS.gBrowser_hack.enabled` to `true` on next startup. You can always set that pref manually if you wish.
+So, if boot.sys.mjs detects that startup has been broken because gBrowser is not available, it will show said banner. Clicking the "Enable workaround"-button will tell boot.sys.mjs to set a pref `userChromeJS.gBrowser_hack.enabled` to `true` on next startup. You can always set that pref manually if you wish.
 
-Note: there's is also related pref `userChromeJS.gBrowser_hack.required` which boot.jsm uses to tell itself that startup was broken on last run.
+Note: there's is also related pref `userChromeJS.gBrowser_hack.required` which boot.sys.mjs uses to tell itself that startup was broken on last run. Neiter the `.required` or `.enabled` pref might not exist if the loader has not detected broken startup.
+
+If you later want to disable the "gBrowser hack" then you need to set **both** `userChromeJS.gBrowser_hack.enabled` and `userChromeJS.gBrowser_hack.required` to false - or simply removing both prefs.
 
 ## What causes this error?
 

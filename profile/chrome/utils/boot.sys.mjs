@@ -25,7 +25,6 @@ const BROWSERCHROME = (() => {
 
 const PREF_ENABLED = 'userChromeJS.enabled';
 const PREF_SCRIPTSDISABLED = 'userChromeJS.scriptsDisabled';
-const PREF_GBROWSERHACKENABLED = 'userChromeJS.gBrowser_hack.enabled';
 
 function getDisabledScripts(){
   return Services.prefs.getStringPref(PREF_SCRIPTSDISABLED,"").split(",")
@@ -271,10 +270,10 @@ class ScriptData {
 
 Pref.setIfUnset(PREF_ENABLED,true);
 Pref.setIfUnset(PREF_SCRIPTSDISABLED,"");
-Pref.setIfUnset(PREF_GBROWSERHACKENABLED,false);
 
+// This is called if _previous_ startup was broken
 function showgBrowserNotification(){
-  Services.prefs.setBoolPref(PREF_GBROWSERHACKENABLED,true);
+  Services.prefs.setBoolPref('userChromeJS.gBrowser_hack.enabled',true);
   utils.showNotification(
   {
     label : "fx-autoconfig: Something was broken in last startup",
@@ -294,6 +293,7 @@ function showgBrowserNotification(){
   )
 }
 
+// This is called if startup somehow takes over 5 seconds
 function showBrokenNotification(window){
   let aNotificationBox = window.gNotificationBox;
   aNotificationBox.appendNotification(
@@ -378,9 +378,9 @@ class UserChrome_js{
     }
     loaderModuleLink.setup(this,FX_AUTOCONFIG_VERSION,AppConstants.MOZ_APP_DISPLAYNAME_DO_NOT_USE,APP_VARIANT,SHARED_GLOBAL,ScriptData);
     // gBrowserHack setup
-    const gBrowserHackRequired = Services.prefs.getBoolPref("userChromeJS.gBrowser_hack.required",false) ? 2 : 0;
-    const gBrowserHackEnabled = Services.prefs.getBoolPref(PREF_GBROWSERHACKENABLED,false) ? 1 : 0;
-    this.GBROWSERHACK_ENABLED = gBrowserHackRequired|gBrowserHackEnabled;
+    this.GBROWSERHACK_ENABLED = 
+      (Services.prefs.getBoolPref("userChromeJS.gBrowser_hack.required",false) ? 2 : 0)
+    + (Services.prefs.getBoolPref("userChromeJS.gBrowser_hack.enabled",false) ? 1 : 0);
     const disabledScripts = getDisabledScripts();
     // load script data
     const scriptDir = FS.getScriptDir();
