@@ -584,7 +584,7 @@ Above line is also left empty
     }
   ).expectAsync(40) // 40 bytes written
   // Set allowUnsafeWrites pref back to false
-  .then(() => _ucUtils.prefs.set(PREF_ALLLOW_UNSAFE,false))
+  .then(() => Services.prefs.clearUserPref(PREF_ALLLOW_UNSAFE))
   .then(() => {
     // Check that writing userChrome.css now fails again
     new Test(
