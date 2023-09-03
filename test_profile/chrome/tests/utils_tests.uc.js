@@ -60,6 +60,7 @@ Above line is also left empty
   "legacy_tests.uc.js",
   "utils_tests.uc.js",
   "write_to_shared.uc.js",
+  "x_disabled_system_module",
   "x_disabled_test.uc.js"
   ];
   console.info("%crunning tests...","color: rgb(120,160,240)");
@@ -301,7 +302,7 @@ Above line is also left empty
       .join(",")
       return scripts.length + ";" + names
     }
-  ).expect(TEST_FILES.length+";,test_module_script,test_module_script_ESM,test_non_background_mjs,test_registering_manifest,test_runner,test_utils,test_utils_legacy,write-42,x_disabled"),
+  ).expect(TEST_FILES.length+";,test_module_script,test_module_script_ESM,test_non_background_mjs,test_registering_manifest,test_runner,test_utils,test_utils_legacy,write-42,x_disabled,x_disabled_system_module"),
 
   // Tests load order.
   // The current script (this one) should be false.
@@ -319,7 +320,7 @@ Above line is also left empty
               .map(a => a.isRunning)
               .join(",");
     }
-  ).expect("false,true,true,false,false,true,false,false,true,false"),
+  ).expect("false,true,true,false,false,true,false,false,true,false,false"),
   
   // Test invalid getScriptData() filter 1
   new Test(
@@ -369,7 +370,7 @@ Above line is also left empty
   new Test(
     "getScriptInfoWithFilter",
     () => _ucUtils.getScriptData(s => s.inbackground).length
-  ).expect(3),
+  ).expect(4),
   
   // Test getting correct chromeURI via ScriptInfo
   new Test(
