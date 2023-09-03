@@ -358,19 +358,20 @@ class UserChrome_js{
     this.initialized = false;
     this.init();
   }
-  registerScript(aScript,isEnabled){
+  registerScript(aScript,isDisabled){
     if(aScript.type === "script"){
       this.scripts.push(aScript);
     }else{
       this.styles.push(aScript);
     }
-    if(isEnabled && aScript.manifest){
+    if(!isDisabled && aScript.manifest){
       try{
         ScriptData.registerScriptManifest(aScript);
       }catch(ex){
         console.error(new Error(`@ ${aScript.filename}`,{cause:ex}));
       }
     }
+    return isDisabled
   }
   init(){
     if(this.initialized){
@@ -388,7 +389,9 @@ class UserChrome_js{
       for(let entry of scriptDir){
         if (/^[A-Za-z0-9]+.*(\.uc\.js|\.uc\.mjs|\.sys\.mjs)$/i.test(entry.leafName)) {
           let script = ScriptData.fromScriptFile(entry);
-          this.registerScript(script,!disabledScripts.includes(script.filename));
+          if(this.registerScript(script,disabledScripts.includes(script.filename))){
+            continue // script is disabled
+          }
           if(script.inbackground){
             try{
               if(script.isESM){
