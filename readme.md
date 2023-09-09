@@ -110,6 +110,16 @@ For window scoped scripts (classic `.uc.js` and `.uc.mjs`) it the toggling shoul
 
 A global preference to toggle all scripts is `userChromeJS.enabled`. This will disable all scripts but leaves the restart-button in the custom menu available.
 
+## Styles
+
+From version `0.8.5` onwards the loader also supports injection of styles. The default directory where loader looks for them is `chrome/CSS/` which again can be re-mapped by modifying `chrome/utils/chrome.manifest`
+
+File name of styles must end with `.uc.css` which the loader will pick up automatically - just like scripts. By default, scripts are injected in *author* mode only into browser.xhtml - you can register other targets using the header @include directives just like scripts.
+
+Alternatively you can use `@stylemode      agent_sheet` directive in header to make loader register it as agent style. User styles are not supported currently - just use userChrome.css for that.
+
+Notice that the header format for styles is slightly different than it is for scripts because CSS doesn't support `//` line comments.
+
 ## Filenames
 
 Script files (among other things) are loaded using `chrome://` protocol. Chrome urls are of form:
@@ -341,6 +351,31 @@ _ucUtils.sharedGlobal.myScriptObject = {
 ```
 
 **NOTE** This is behavior is completely incompatible with the way old userscripts implement startup - which generally was of form `eval(<whatever_is_in_header_startup>)`
+
+## @stylemode (styles only)
+
+Default value is `author_sheet` - valid values are `author_sheet` and `agent_sheet`
+
+```js
+/* ==UserScript==
+// @name           agent style sheet
+// @description    an example for @stylemode directive
+// @stylemode      agent_sheet
+// ==/UserScript== */
+```
+
+Tells the loader in which mode this style should be injected. Agent sheets are global, author sheets are per document you inject them into (default browser.xhtml)
+
+## @usefileuri (styles only)
+
+Tells the loader to register this style using its `file:///` url instead of `chrome://` url. 
+
+/* ==UserScript==
+// @name           author style sheet
+// @usefileuri 
+// ==/UserScript== */
+
+Note that some CSS features may not be available for file:// uri styles. However, chrome:// styles cannot be modified using devtools, while file:// uri styles can be.
 
 # Utils
 
