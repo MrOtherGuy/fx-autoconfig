@@ -319,6 +319,29 @@ console.log("Hello world!") // This is only run in the first window that opens.
 
 ```
 
+## @startup
+
+Scripts can define a function to be executed when they are loaded in the header portion of the script. Consider the following header:
+
+    // ==UserScript==
+    // @name            My Test Script
+    // @onlyonce
+    // @startup         myScriptObject
+    
+This tells the loader to execute this script file only once per session because of `@onlyonce` directive. But the header also tells the loader to execute a special function named `_startup` from `sharedGlobal.myScriptObject` on *each* window. This makes it possible to do some global initialization work once and then run only the `_startup` function for each window created afterwards.
+
+The _startup function will receive one argument - reference to the window object where it was executed.
+
+In short, to use startup directive you need to store an object named `myScriptObject` to the sharedGlobal object and the myScriptObject must have a property called `_startup`.
+
+```js
+_ucUtils.sharedGlobal.myScriptObject = {
+  _startup: function(win){ console.log(win.location) }
+}
+```
+
+**NOTE** This is behavior is completely incompatible with the way old userscripts implement startup - which generally was of form `eval(<whatever_is_in_header_startup>)`
+
 # Utils
 
 ## General
@@ -804,26 +827,6 @@ let global = _ucUtils.sharedGlobal
 ```
 
 The information in the global object is available for all scripts
-
-## Startup directive
-
-Scripts can define a function to be executed when they are loaded in the header portion of the script. Consider the following header:
-
-    // ==UserScript==
-    // @name            My Test Script
-    // @startup         myScriptObject
-    
-This tells the loader to execute a special function named `_startup` from `globalShared.myScriptObject`. The _startup function will receive one argument - reference to the window object where it was executed.
-
-In short, to use startup directive you need to store an object named `myScriptObject` to the globalShared object and the myScriptObject must have a property called `_startup`.
-
-```js
-_ucUtils.sharedGlobal.myScriptObject = {
-  _startup: function(win){ console.log(win.location) }
-}
-```
-
-**NOTE** This is behavior is completely incompatible with the way old userscripts implement startup - which generally was of form `eval(<whatever_is_in_header_startup>)`
 
 # Startup Error
 

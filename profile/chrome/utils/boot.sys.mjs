@@ -192,7 +192,11 @@ class ScriptData {
   }
   static markScriptRunning(aScript,aGlobal){
     aScript.#isRunning = true;
-    aScript.startup && SharedGlobal[aScript.startup]._startup(aGlobal);
+    try{
+      aScript.startup && SharedGlobal[aScript.startup]._startup(aGlobal);
+    }catch(ex){
+      console.error(new Error(`${aScript.filename}: requested _startup function could not be found in SharedGlobal.${aScript.startup}`,{cause: ex}));
+    }
     return
   }
   static injectESMIntoGlobal(aScript,aGlobal){
