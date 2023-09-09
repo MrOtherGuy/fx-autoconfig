@@ -192,7 +192,7 @@ let EXPORTED_SYMBOLS = [];
 
 Alternatively, you can name your script with `.sys.mjs` file extension in which case the loader automatically treats it as backgroundmodule.
 
-Note that the `EXPORTED_SYMBOLS` array like above in module global scope is mandatory in `.uc.js` scripts when they are loaded as backgroundmodule.
+Note that the `EXPORTED_SYMBOLS` array like above in module global scope is mandatory in `.uc.js` scripts when they are loaded as backgroundmodule. It is not necessary in `.sys.mjs` scripts.
 
 ### ES6 modules
 

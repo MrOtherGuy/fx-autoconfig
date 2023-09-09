@@ -72,7 +72,12 @@ Above line is also left empty
     "sharedGlobal",
     () => { return _ucUtils.sharedGlobal.test_utils.x }
   ).expect(42),
-
+  
+  new Test(
+    "sharedGlobal_got_ESM_set_value",
+    () => { return _ucUtils.sharedGlobal.test_module_script_ESM.y }
+  ).expect(42),
+  
   // Does _ucUtils give us correct brandName
   new Test(
     "brandName",

@@ -4,10 +4,16 @@
 
 import { some } from "chrome://userscripts/content/modules/imported_esm.sys.mjs";
 import { Test } from "chrome://userscripts/content/000_test_runner.sys.mjs";
+import { SharedGlobal } from "chrome://userchromejs/content/utils.sys.mjs";
 
 new Test("expectError_no_utils_ESM",()=>{
   return _ucUtils.sharedGlobal.test_utils.x
 }).expectError();
+
+new Test("ESM_sharedGlobal_written",()=>{
+  SharedGlobal.test_module_script_ESM = {y: 42};
+  return true
+}).expect(true);
 
 new Test("expectError_no_window_ESM",()=>{
   return window

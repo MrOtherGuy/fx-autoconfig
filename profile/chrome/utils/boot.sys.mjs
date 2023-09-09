@@ -1,12 +1,9 @@
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 import { FileSystem as FS } from "chrome://userchromejs/content/fs.sys.mjs";
-import { _ucUtils as utils, loaderModuleLink, Pref } from "chrome://userchromejs/content/utils.sys.mjs";
+import { _ucUtils as utils, loaderModuleLink, Pref, SharedGlobal } from "chrome://userchromejs/content/utils.sys.mjs";
 
 const FX_AUTOCONFIG_VERSION = "0.8.6";
 console.warn( "Browser is executing custom scripts via autoconfig" );
-
-const SHARED_GLOBAL = {};
-Object.defineProperty(SHARED_GLOBAL,"widgetCallbacks",{value:new Map()});
 
 const APP_VARIANT = (() => {
   let is_tb = AppConstants.BROWSER_CHROME_URL.startsWith("chrome://messenger");
@@ -181,7 +178,7 @@ class ScriptData {
     }
     if(aScript.onlyonce && aScript.#isRunning) {
       if(aScript.startup){
-        SHARED_GLOBAL[aScript.startup]._startup(win)
+        SharedGlobal[aScript.startup]._startup(win)
       }
       return
     }
@@ -195,7 +192,7 @@ class ScriptData {
   }
   static markScriptRunning(aScript,aGlobal){
     aScript.#isRunning = true;
-    aScript.startup && SHARED_GLOBAL[aScript.startup]._startup(aGlobal);
+    aScript.startup && SharedGlobal[aScript.startup]._startup(aGlobal);
     return
   }
   static injectESMIntoGlobal(aScript,aGlobal){
@@ -377,7 +374,7 @@ class UserChrome_js{
     if(this.initialized){
       return
     }
-    loaderModuleLink.setup(this,FX_AUTOCONFIG_VERSION,AppConstants.MOZ_APP_DISPLAYNAME_DO_NOT_USE,APP_VARIANT,SHARED_GLOBAL,ScriptData);
+    loaderModuleLink.setup(this,FX_AUTOCONFIG_VERSION,AppConstants.MOZ_APP_DISPLAYNAME_DO_NOT_USE,APP_VARIANT,ScriptData);
     // gBrowserHack setup
     this.GBROWSERHACK_ENABLED = 
       (Services.prefs.getBoolPref("userChromeJS.gBrowser_hack.required",false) ? 2 : 0)
