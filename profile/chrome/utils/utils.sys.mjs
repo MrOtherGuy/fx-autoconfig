@@ -2,6 +2,10 @@ import { FileSystem as FS } from "chrome://userchromejs/content/fs.sys.mjs";
 
 export const SharedGlobal = {};
 ChromeUtils.defineLazyGetter(SharedGlobal,"widgetCallbacks",() => {return new Map()});
+const lazy = {};
+ChromeUtils.defineESModuleGetters(lazy,{
+  CustomizableUI: "resource:///modules/CustomizableUI.sys.mjs"
+});
 
 export class Pref{
   #type;
@@ -262,6 +266,7 @@ function updateStyleSheet(name, type) {
   }
   return false
 }
+
 // This stores data we need to link from the loader module
 export const loaderModuleLink = new (function(){
   let sessionRestored = false;
@@ -352,7 +357,7 @@ export class _ucUtils{
     if(!(desc.type === "toolbarbutton" || desc.type === "toolbaritem")){
       throw new Error(`custom widget has unsupported type: '${desc.type}'`);
     }
-    const CUI = Services.wm.getMostRecentBrowserWindow().CustomizableUI;
+    const CUI = lazy.CustomizableUI;
     
     if(CUI.getWidget(desc.id)?.hasOwnProperty("source")){
       // very likely means that the widget with this id already exists
