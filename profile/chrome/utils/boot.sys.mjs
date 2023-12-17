@@ -132,7 +132,7 @@ class ScriptData {
         aScript.#preCompiledESM = script;
         resolve(script);
       })
-      .catch( (ex) => resolve(ScriptData.onCompileRejection(ex,aScript.filename)) )
+      .catch( (ex) => resolve(ScriptData.onCompileRejection(ex,aScript)) )
       .finally(()=>{aScript.#preCompiling = null})
     });
     return aScript.#preCompiling
