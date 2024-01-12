@@ -405,8 +405,10 @@ _ucUtils.createWidget({
     console.log(ev.target.id)
   }
 })
-
 ```
+
+**Note:** Any keys in the `details` object that are not mentioned above are added to the created element as attributes.
+
 Widget is a wrapper for actual elements. Firefox tracks widget placements *across windows* meaning that you can create the widget once and then you can re-position it using customize mode and its new location will be shared in all windows. The wrapper contains information about the instances of that widget in windows.
 
 The **class** of elements using this will by default be "toolbarbutton-1 chromeclass-toolbar-additional" and the value of the class property (when provided) will be added into that.
