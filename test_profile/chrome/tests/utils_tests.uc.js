@@ -123,7 +123,11 @@ Above line is also left empty
             if(aNode.id === widgetID){
               window.CustomizableUI.removeListener(listener);
               try{
-                resolve(window.getComputedStyle(aNode.icon).fill)
+                resolve(
+                  aNode.getAttribute("command") + ";"
+                  + aNode.getAttribute("image") + ";"
+                  + window.getComputedStyle(aNode.icon).fill
+                )
               }catch(ex){
                 reject(ex)
               }
@@ -142,12 +146,13 @@ Above line is also left empty
           style: "--toolbarbutton-icon-fill: #f0f; color: #f0f;",
           callback: function(ev,win){
             console.log(win.document.title)
-          }
+          },
+          command: "Browser:Screenshot"
         });
         
       });
     }
-  ).expectAsync("rgb(255, 0, 255)"),
+  ).expectAsync("Browser:Screenshot;chrome://browser/skin/bookmark-star-on-tray.svg;rgb(255, 0, 255)"),
 
   // Synchronously read file content with string argument treated as relative path
   new Test(

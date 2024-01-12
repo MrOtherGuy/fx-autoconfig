@@ -377,8 +377,10 @@ export class _ucUtils{
         : `url(chrome://userChrome/content/${desc.image});`;
       itemStyle += desc.style || "";
     }
-    SharedGlobal.widgetCallbacks.set(desc.id,desc.callback);
-
+    const callback = desc.callback;
+    if(typeof callback === "function"){
+      SharedGlobal.widgetCallbacks.set(desc.id,callback);
+    }
     return CUI.createWidget({
       id: desc.id,
       type: 'custom',
@@ -391,12 +393,20 @@ export class _ucUtils{
           overflows: !!desc.overflows,
           label: desc.label || desc.id,
           tooltiptext: desc.tooltip || desc.id,
-          style: itemStyle,
-          onclick: `${desc.allEvents?"":"event.button===0 && "}_ucUtils.sharedGlobal.widgetCallbacks.get(this.id)(event,window)`
+          style: itemStyle
         };
         for (let p in props){
           toolbaritem.setAttribute(p, props[p]);
         }
+        if(typeof callback === "function"){
+          toolbaritem.setAttribute("onclick",`${desc.allEvents?"":"event.button===0 && "}_ucUtils.sharedGlobal.widgetCallbacks.get(this.id)(event,window)`);
+        }
+        for (let attr in desc){
+          if(attr != "callback" && !(attr in props)){
+            toolbaritem.setAttribute(attr,desc[attr])
+          }
+        }
+
         return toolbaritem;
       }
     });
