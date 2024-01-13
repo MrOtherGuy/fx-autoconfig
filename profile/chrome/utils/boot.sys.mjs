@@ -2,7 +2,7 @@ import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 import { FileSystem as FS } from "chrome://userchromejs/content/fs.sys.mjs";
 import { _ucUtils as utils, loaderModuleLink, Pref, SharedGlobal } from "chrome://userchromejs/content/utils.sys.mjs";
 
-const FX_AUTOCONFIG_VERSION = "0.8.6";
+const FX_AUTOCONFIG_VERSION = "0.8.7";
 console.warn( "Browser is executing custom scripts via autoconfig" );
 
 const APP_VARIANT = (() => {
@@ -295,12 +295,16 @@ function showgBrowserNotification(){
 }
 
 // This is called if startup somehow takes over 5 seconds
-function showBrokenNotification(window){
+function maybeShowBrokenNotification(window){
+  if(window.isFullyOccluded && "gBrowser" in window){
+    console.log("Window was fully occluded, no need to panic")
+    return
+  }
   let aNotificationBox = window.gNotificationBox;
   aNotificationBox.appendNotification(
     "fx-autoconfig-broken-notification",
     {
-      label: "fx-autoconfig: Startup is broken",
+      label: "fx-autoconfig: Startup might be broken",
       image: "chrome://browser/skin/notification-icons/popup.svg",
       priority: "critical"
     },
@@ -468,7 +472,7 @@ class UserChrome_js{
     }else if(_gb && this.isInitialWindow){
       this.isInitialWindow = false;
       let timeout = window.setTimeout(() => {
-        showBrokenNotification(window);
+        maybeShowBrokenNotification(window);
       },5000);
       utils.windowIsReady(window)
       .then(() => {
