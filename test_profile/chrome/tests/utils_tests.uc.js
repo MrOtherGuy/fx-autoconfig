@@ -372,6 +372,27 @@ Above line is also left empty
     return scriptInfo.filename === "fake-file.txt"
             && scriptInfo.isRunning === false
             && scriptInfo.noExec === true
+            && scriptInfo.regex === null
+            && scriptInfo.loadOrder === -1
+  }),
+  
+  // Test ScriptInfo where default regex should be created
+  new Test(
+    "getScriptInfoFromStringWithoutNoExec",
+    () => {
+      const headertext = `// ==UserScript==
+// @name           fake-text-2
+// @description    hello world 2!
+// @loadOrder 5
+// ==/UserScript==
+console.log("hello world!")
+`;
+      return _ucUtils.parseStringAsScriptInfo("fake-file.txt",headertext);
+    }
+  ).expect( scriptInfo => {
+    return scriptInfo.filename === "fake-file.txt"
+            && scriptInfo.isRunning === false
+            && scriptInfo.noExec === false
             && scriptInfo.regex.test("chrome://browser/content/browser.xhtml")
             && scriptInfo.loadOrder === 5
   }),

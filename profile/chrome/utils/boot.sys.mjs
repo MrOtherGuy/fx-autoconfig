@@ -66,7 +66,7 @@ class ScriptData {
     this.useFileURI = /\/\/ @usefileuri\b/.test(headerText);
     this.noExec = isStyle || noExec;
     
-    if(this.inbackground || this.styleSheetMode === "agent"){
+    if(this.inbackground || this.styleSheetMode === "agent" || (!isStyle && noExec)){
       this.regex = null;
       this.loadOrder = -1;
     }else{
