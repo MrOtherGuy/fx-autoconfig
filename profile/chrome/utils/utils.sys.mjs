@@ -326,10 +326,10 @@ export class ScriptInfo{
     info.injectionFailed = aScript.injectionFailed;
     return info
   }
-  static fromString(aName, aStringAsFSResult) {
+  static fromString(aName, aStringAsFSResult, isStyle) {
     const ScriptData = loaderModuleLink.scriptDataConstructor;
     const headerText = ScriptData.extractScriptHeader(aStringAsFSResult);
-    const scriptData = new ScriptData(aName, headerText, headerText.length > aStringAsFSResult.size - 2,false);
+    const scriptData = new ScriptData(aName, headerText, headerText.length > aStringAsFSResult.size - 2, isStyle);
     return ScriptInfo.fromScript(scriptData, false)
   }
 }
@@ -475,8 +475,8 @@ export class _ucUtils{
   static openStyleDir(){
     return FS.getStyleDir().showInFileManager()
   }
-  static parseStringAsScriptInfo(aName, aString){
-    return ScriptInfo.fromString(aName, FS.StringContent({content: aString}))
+  static parseStringAsScriptInfo(aName, aString, isStyle = false){
+    return ScriptInfo.fromString(aName, FS.StringContent({content: aString}), isStyle)
   }
   static prefs = {
     get: (prefPath) => Pref.fromName(prefPath),
