@@ -319,7 +319,7 @@ export class ScriptInfo{
   static fromScript(aScript, isEnabled){
     let info = new ScriptInfo(isEnabled);
     Object.assign(info,aScript);
-    info.regex = new RegExp(aScript.regex.source, aScript.regex.flags);
+    info.regex = aScript.regex ? new RegExp(aScript.regex.source, aScript.regex.flags) : null;
     info.chromeURI = aScript.chromeURI.spec;
     info.referenceURI = aScript.referenceURI.spec;
     info.isRunning = aScript.isRunning;

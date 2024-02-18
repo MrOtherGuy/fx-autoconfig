@@ -65,26 +65,27 @@ class ScriptData {
       : null;
     this.useFileURI = /\/\/ @usefileuri\b/.test(headerText);
     this.noExec = isStyle || noExec;
-    // Construct regular expression to use to match target document
-    let match, rex = {
-      include: [],
-      exclude: []
-    };
-    let findNextRe = /^\/\/ @(include|exclude)\s+(.+)\s*$/gm;
-    while (match = findNextRe.exec(headerText)) {
-      rex[match[1]].push(
-        match[2].replace(/^main$/i, BROWSERCHROME).replace(/\*/g, '.*?')
-      );
-    }
-    if (!rex.include.length) {
-      rex.include.push(BROWSERCHROME);
-    }
-    let exclude = rex.exclude.length ? `(?!${rex.exclude.join('$|')}$)` : '';
-    this.regex = new RegExp(`^${exclude}(${rex.include.join('|') || '.*'})$`,'i');
     
-    if(this.inbackground){
+    if(this.inbackground || this.styleSheetMode === "agent"){
+      this.regex = null;
       this.loadOrder = -1;
     }else{
+      // Construct regular expression to use to match target document
+      let match, rex = {
+        include: [],
+        exclude: []
+      };
+      let findNextRe = /^\/\/ @(include|exclude)\s+(.+)\s*$/gm;
+      while (match = findNextRe.exec(headerText)) {
+        rex[match[1]].push(
+          match[2].replace(/^main$/i, BROWSERCHROME).replace(/\*/g, '.*?')
+        );
+      }
+      if (!rex.include.length) {
+        rex.include.push(BROWSERCHROME);
+      }
+      let exclude = rex.exclude.length ? `(?!${rex.exclude.join('$|')}$)` : '';
+      this.regex = new RegExp(`^${exclude}(${rex.include.join('|') || '.*'})$`,'i');
       let loadOrder = headerText.match(/\/\/ @loadOrder\s+(\d+)\s*$/im)?.[1];
       this.loadOrder = Number.parseInt(loadOrder) || 10;
     }
@@ -160,7 +161,7 @@ class ScriptData {
   }
   
   static tryLoadScriptIntoWindow(aScript,win){
-    if(!aScript.regex.test(win.location.href)){
+    if(aScript.regex === null || !aScript.regex.test(win.location.href)){
       return
     }
     if(aScript.type === "style" && aScript.styleSheetMode === "author"){
