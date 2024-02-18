@@ -490,9 +490,13 @@ console.log(`You have ${scripts.length} running scripts);
 
 **Note!** If the first argument is anything other than a function or a string, then `getScriptData()` will throw an error.
 
-### \_ucUtils.parseStringAsScriptInfo(aName, aString) -> ScriptInfo
+### \_ucUtils.getStyleData(aFilter) -> Array | ScriptInfo
 
-This can be used to construct a `ScriptInfo` object from arbitrary string following the same logic the loader uses internally. When given `aName` as "filename" the `aString` is parsed just like script metadata block in your files.
+Mechanically exactly the same as `getScriptData()` but returns styles instead of scripts.
+
+### \_ucUtils.parseStringAsScriptInfo(aName, aString, parseAsStyle) -> ScriptInfo
+
+This can be used to construct a `ScriptInfo` object from arbitrary string following the same logic the loader uses internally. When given `aName` as "filename" the `aString` is parsed just like script metadata block in your files. optional `parseAsStyle` argument, when truthy, makes the method parse `aString` as style instead of a script.
 
 ```js
 let myMetadataBlock = `// ==UserScript==
@@ -501,9 +505,14 @@ let myMetadataBlock = `// ==UserScript==
 // ==/UserScript==
 `;
 
-let scriptInfo = _ucUtils.parseStringAsScriptInfo("fakeFileName",myMetadataBlock);
-console.log(scriptInfo.name)
-// "my-test-info"
+let scriptInfo = _ucUtils.parseStringAsScriptInfo("fakeFileName", myMetadataBlock);
+console.log(scriptInfo.name, scriptInfo.chromeURI);
+// "my-test-info chrome://userscripts/content/fakeFileName"
+
+let styleInfo = _ucUtils.parseStringAsScriptInfo("fakeFileName", myMetadataBlock, true);
+console.log(styleInfo.name, styleInfo.chromeURI);
+// "my-test-info chrome://userstyles/skin/fakeFileName"
+
 ```
 
 **Note!** There needs to be a new-line after the closing `// ==/UserScript==` "tag" for the metadata to be parsed correctly.
