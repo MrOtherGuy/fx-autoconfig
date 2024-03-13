@@ -50,6 +50,35 @@ Firefox is typically installed to `/Applications/Firefox.app/Contents/MacOS/` or
 Copy `defaults/` and `config.js` to `/Applications/Firefox.app/Contents/Resources/` from the `program` folder. `config.js` should end up in the `/Applications/Firefox.app/Contents/Resources/` directory.
 
 </details>
+<details>
+<summary>Nix</summary>
+
+  NixOS:
+  
+```nix
+programs.firefox = {
+  enable = true;
+  autoConfig = builtins.readFile(builtins.fetchurl {  
+    url = "https://raw.githubusercontent.com/MrOtherGuy/fx-autoconfig/master/program/config.js";
+    sha256 = "1mx679fbc4d9x4bnqajqx5a95y1lfasvf90pbqkh9sm3ch945p40";
+  });
+};
+```
+
+Home Manager:
+
+```nix
+home.packages = with pkgs; [
+  (firefox.override {
+    extraPrefsFiles = [(builtins.fetchurl {  
+      url = "https://raw.githubusercontent.com/MrOtherGuy/fx-autoconfig/master/program/config.js";
+      sha256 = "1mx679fbc4d9x4bnqajqx5a95y1lfasvf90pbqkh9sm3ch945p40";
+    })];
+  })
+];
+```
+
+</details>
 
 ## Setting up profile
 
