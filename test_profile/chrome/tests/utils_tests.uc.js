@@ -444,14 +444,6 @@ console.log("hello world!")
     return lines.length === 6
         && lines[lines.length - 1] === "Above line is also left empty";
   }),
-  
-  // Can get reference to first browser-window window-object
-  new Test(
-    "getWindows",
-    () => {
-      return _ucUtils.windows.get()[0].AppConstants.MOZ_APP_BASENAME;
-    }
-  ).expect((val) => val === "Firefox"),
 
   // TODO togglescript
   
@@ -494,7 +486,7 @@ console.log("hello world!")
       const getNavBarStyle = () => window.getComputedStyle(document.getElementById("nav-bar"));
       
       return new Promise((resolve, reject) => {
-        _ucUtils.windowIsReady(window)
+        _ucUtils.windows.waitWindowLoading(window)
         .then( () => {
           // The color expected here is set in one of the tests that follow
           let oldColor = getNavBarStyle().backgroundColor;
@@ -521,36 +513,52 @@ console.log("hello world!")
       })
     }
   ).expectAsync((val) => val === 42),
-
+  
+  // Can get reference to first browser-window window-object
+  new Test(
+    "windows.getAll",
+    () => {
+      return _ucUtils.windows.getAll()[0].AppConstants.MOZ_APP_BASENAME;
+    }
+  ).expect((val) => val === "Firefox"),
+  
+  // Is this a browser window
+  
+  new Test(
+    "windows.isBrowserWindow",
+    () => {
+      return _ucUtils.windows.isBrowserWindow(window);
+    }
+  ).expect(true),
+  
   // Has current window object been fully restored 
   new Test(
-    "WindowIsReady",
+    "windows.waitWindowLoading",
     () => {
-      return new Promise((resolve, reject) => {
+      return new Promise(async (resolve, reject) => {
         setTimeout(reject, 8000);
-        _ucUtils.windowIsReady(window)
-        .then(() => resolve(42))
+        let init1 = window.gBrowserInit.delayedStartupFinished;
+        await _ucUtils.windows.waitWindowLoading(window);
+        resolve( `${init1};${window.gBrowserInit.delayedStartupFinished}`)
       })
     }
-  ).expectAsync(42),
+  ).expectAsync("false;true"),
 
   new Test(
-    "registerHotkey",
+    "hotkeys.define",
     () => {
       let details = {
         id: "myHotkey",
         modifiers: "ctrl shift",
-        key: "Y"
+        key: "y",
+        command: (win,ev) => { console.log(win.document.title)}
       };
-      
-      let val = _ucUtils.registerHotkey(details,() => ({}) );
-      if(!val){
-        return false
-      }
+      let hk = _ucUtils.hotkeys.define(details);
+      hk.attachToWindow(window);
       let key = document.getElementById("myHotkey");
-      return key.getAttribute("modifiers") + "," + key.getAttribute("key");
+      return key.getAttribute("modifiers") + "," + key.getAttribute("key")+","+hk.matchingSelector;
     }
-  ).expect("accel,shift,Y"),
+  ).expect('accel,shift,Y,key[modifiers="accel,shift"][key="Y"]'),
 
   // TODO loadURI
 

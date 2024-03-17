@@ -2,10 +2,132 @@ import { FileSystem as FS } from "chrome://userchromejs/content/fs.sys.mjs";
 
 export const SharedGlobal = {};
 ChromeUtils.defineLazyGetter(SharedGlobal,"widgetCallbacks",() => {return new Map()});
-const lazy = {};
+const lazy = {
+  startupPromises: new Set()
+};
 ChromeUtils.defineESModuleGetters(lazy,{
   CustomizableUI: "resource:///modules/CustomizableUI.sys.mjs"
 });
+
+export class Hotkey{
+  #matchingSelector;
+  constructor(hotkeyDetails,commandDetails){
+    this.command = commandDetails;
+    this.trigger = hotkeyDetails;
+    this.#matchingSelector = `key[modifiers="${hotkeyDetails.modifiers}"][${hotkeyDetails.key?'key="'+hotkeyDetails.key:'keycode="'+hotkeyDetails.keycode}"]`;
+  }
+  get matchingSelector(){
+    return this.#matchingSelector
+  }
+  autoAttach(opt){
+    const suppress = opt?.suppressOriginal || false;
+    for (let window of windowUtils.getAll()){
+      if(window.document.getElementById(this.trigger.id)){
+        continue
+      }
+      this.attachToWindow(window,{suppressOriginal: suppress})
+    }
+    windowUtils.onCreated(win => {
+      windowUtils.isBrowserWindow(win) && this.attachToWindow(win,{suppressOriginal: suppress})
+    })
+  }
+  attachToWindow(window,opt = {}){
+    if(opt.suppressOriginal){
+      this.suppressOriginalKey(window)
+    }
+    Hotkey.#createKey(window.document,this.trigger);
+    if(this.command){
+      Hotkey.#createCommand(window.document,this.command);
+    }
+  }
+  suppressOriginalKey(window){
+    let oldKey = window.document.querySelector(this.#matchingSelector);
+    if(oldKey){
+      oldKey.setAttribute("disabled","true")
+    }
+  }
+  restoreOriginalKey(window){
+    let oldKey = window.document.querySelector(this.#matchingSelector);
+    oldKey.removeAttribute("disabled");
+  }
+  static #createKey(doc,details){
+    let keySet = doc.getElementById("ucKeySet");
+    if(!keySet){
+      keySet = _ucUtils.createElement(doc,"keyset",{id:"ucKeySet"});
+      doc.body.appendChild(keySet);
+    }
+    
+    let key = _ucUtils.createElement(doc,"key",details);
+    keySet.appendChild(key);
+    return
+  }
+  static #createCommand(doc,details){
+    let commandSet = doc.getElementById("ucCommandSet");
+    if(!commandSet){
+      commandSet = _ucUtils.createElement(doc,"commandset",{id:"ucCommandSet"});
+      doc.body.insertBefore(commandSet,doc.body.firstChild);
+    }
+    if(doc.getElementById(details.id)){
+      console.warn("Fx-autoconfig: command with id '"+details.id+"' already exists");
+      return
+    }
+    let command = _ucUtils.createElement(doc,"command",{id: details.id,oncommand: "this._oncommand(event);"});
+    commandSet.insertBefore(command,commandSet.firstChild||null);
+    const fun = details.command;
+    command._oncommand = (e) => fun(e.view,e);
+    return
+  }
+  static ERR_KEY = 0;
+  static NORMAL_KEY = 1;
+  static FUN_KEY = 2;
+  
+  static #getKeyCategory(key){
+    return (/^[\w-]$/).test(key)
+          ? Hotkey.NORMAL_KEY
+          : (/^F(?:1[0,2]|[1-9])$/)
+            .test(key)
+            ? Hotkey.FUN_KEY
+            : Hotkey.ERR_KEY
+  }
+  
+  static define(desc){
+    let keyCategory = Hotkey.#getKeyCategory(desc.key);
+    if(keyCategory === Hotkey.ERR_KEY){
+      throw new Error("Provided key '"+desc.key+"' is invalid")
+    }
+    if(keyCategory === Hotkey.FUN_KEY){
+      throw new Error("Registering a hotkey with no modifiers is not supported, except for function keys F1-F12")
+    }
+    let commandType = typeof desc.command;
+    if(!(commandType === "string" || commandType === "function")){
+      throw new TypeError("command must be either a string or function")
+    }
+    
+    const validMods = ["accel","alt","ctrl","meta","shift"];
+    const mods = desc.modifiers.toLowerCase().split(" ").filter(a => validMods.includes(a));
+    let keyDetails = {
+      id: desc.id,
+      modifiers: mods.join(",").replace("ctrl","accel"),
+      command: commandType === "string"
+                ? desc.command
+                : `cmd_${desc.id}`
+    };
+    if(desc.reserved){
+      keyDetails.reserved = "true"
+    }
+    if(keyCategory === Hotkey.NORMAL_KEY){
+      keyDetails.key = desc.key.toUpperCase();
+    }else{
+      keyDetails.keycode = `VK_${desc.key}`;
+    }
+    return new Hotkey(
+      keyDetails,
+      commandType === "function"
+        ? { id: keyDetails.command, command: desc.command }
+        : null
+      )
+  }
+}
 
 export class Pref{
   #type;
@@ -334,6 +456,79 @@ export class ScriptInfo{
   }
 }
 
+export class windowUtils{
+  constructor(){if(new.target){throw new TypeError("windowUtils is not a constructor")}}
+  static onCreated(fun){
+    if(!lazy.windowOpenedCallbacks){
+      Services.obs.addObserver(windowUtils.#observe, 'domwindowopened', false);
+      lazy.windowOpenedCallbacks = new Set();
+    }
+    lazy.windowOpenedCallbacks.add(fun)
+  }
+  static #observe(aSubject) {
+    aSubject.addEventListener(
+      'DOMContentLoaded',
+      windowUtils.#onDOMContent,
+      {once:true});
+  }
+  static getCreatedCallbacks(){
+    return lazy.windowOpenedCallbacks
+  }
+  static #onDOMContent(ev){
+    const window = ev.originalTarget.defaultView;
+    for(let f of lazy.windowOpenedCallbacks){
+      try{
+        f(window)
+      }catch(e){
+        console.error(e)
+      }
+    }
+  }
+  static getLastFocused(windowType){
+    return Services.wm.getMostRecentWindow(windowType === undefined ? windowUtils.mainWindowType : windowType)
+  }
+  static getAll(onlyBrowsers = true){
+    let windows = Services.wm.getEnumerator(onlyBrowsers ? windowUtils.mainWindowType : null);
+    let wins = [];
+    while (windows.hasMoreElements()) {
+      wins.push(windows.getNext());
+    }
+    return wins
+  }
+  static forEach(fun, onlyBrowsers = true){
+    let wins = windowUtils.getAll(onlyBrowsers);
+    wins.forEach((w) => fun(w.document,w))
+  }
+  static isBrowserWindow(window){
+    return window.document.documentElement.getAttribute("windowtype") === windowUtils.mainWindowType
+  }
+  static mainWindowType = loaderModuleLink.variant.FIREFOX ? "navigator:browser" : "mail:3pane";
+  
+  static waitWindowLoading(win){
+    if(win && win.isChromeWindow){
+      if(loaderModuleLink.variant.FIREFOX){
+        if(win.gBrowserInit.delayedStartupFinished){
+          return Promise.resolve(win);
+        }
+      }else{ // APP_VARIANT = THUNDERBIRD
+        if(win.gMailInit.delayedStartupFinished){
+          return Promise.resolve(win);
+        }
+      }
+      return new Promise(resolve => {
+        let observer = (subject) => {
+          if(subject === win){
+            Services.obs.removeObserver(observer, "browser-delayed-startup-finished");
+            resolve(win)
+          }
+        };
+        Services.obs.addObserver(observer, "browser-delayed-startup-finished");
+      });
+    }
+    return Promise.reject(new Error("reference is not a window"))
+  }
+}
+
 export class _ucUtils{
   static get appVariant(){
     return loaderModuleLink.variant.THUNDERBIRD
@@ -489,46 +684,7 @@ export class _ucUtils{
     },
     removeListener:(a)=>( Services.prefs.removeObserver(a.pref,a.observer) )
   }
-  static registerHotkey(desc,func){
-    const validMods = ["accel","alt","ctrl","meta","shift"];
-    const validKey = (k)=>((/^[\w-]$/).test(k) ? 1 : (/^F(?:1[0,2]|[1-9])$/).test(k) ? 2 : 0);
-    const NOK = (a) => (typeof a != "string");
-    const eToO = (e) => ({"metaKey":e.metaKey,"ctrlKey":e.ctrlKey,"altKey":e.altKey,"shiftKey":e.shiftKey,"key":e.srcElement.getAttribute("key"),"id":e.srcElement.getAttribute("id")});
-    
-    if(NOK(desc.id) || NOK(desc.key) || NOK(desc.modifiers)){
-      return false
-    }
-    
-    try{
-      let mods = desc.modifiers.toLowerCase().split(" ").filter((a)=>(validMods.includes(a)));
-      let key = validKey(desc.key);
-      if(!key || (mods.length === 0 && key === 1)){
-        return false
-      }
-      
-      _ucUtils.windows.forEach((doc,win) => {
-        if(doc.getElementById(desc.id)){
-          return
-        }
-        let details = { "id": desc.id, "modifiers": mods.join(",").replace("ctrl","accel"), "oncommand": "//" };
-        if(key === 1){
-          details.key = desc.key.toUpperCase();
-        }else{
-          details.keycode = `VK_${desc.key}`;
-        }
-
-        let el = _ucUtils.createElement(doc,"key",details);
-        
-        el.addEventListener("command",(ev) => {func(ev.target.ownerGlobal,eToO(ev))});
-        let keyset = doc.getElementById("mainKeyset") || doc.body.appendChild(_ucUtils.createElement(doc,"keyset",{id:"ucKeys"}));
-        keyset.insertBefore(el,keyset.firstChild);
-      });
-    }catch(e){
-      console.error(e);
-      return false
-    }
-    return true
-  }
+  static hotkeys = Hotkey;
   static restart(clearCache){
     clearCache && Services.appinfo.invalidateCachesOnRestart();
     let cancelQuit = Cc["@mozilla.org/supports-PRBool;1"].createInstance(Ci.nsISupportsPRBool);
@@ -590,21 +746,23 @@ export class _ucUtils{
     );
   }
   static startupFinished(){
-    return new Promise(resolve => {
-      if(loaderModuleLink.sessionRestored()){
-        resolve();
-      }else{
-        const obs_topic = loaderModuleLink.variant.FIREFOX
+    if(loaderModuleLink.sessionRestored() || lazy.startupPromises === null){
+      return Promise.resolve();
+    }
+    if(lazy.startupPromises.size === 0){
+      const obs_topic = loaderModuleLink.variant.FIREFOX
           ? "sessionstore-windows-restored"
           : "browser-delayed-startup-finished";
-        let observer = (subject, topic, data) => {
-          Services.obs.removeObserver(observer, obs_topic);
-          loaderModuleLink.setSessionRestored();
-          resolve();
-        };
-        Services.obs.addObserver(observer, obs_topic);
+      const startupObserver = () => {
+        Services.obs.removeObserver(startupObserver, obs_topic);
+        loaderModuleLink.setSessionRestored();
+        for(let f of lazy.startupPromises){ f() }
+        lazy.startupPromises.clear();
+        lazy.startupPromises = null;
       }
-    });
+      Services.obs.addObserver(startupObserver, obs_topic);
+    }
+    return new Promise(resolve => lazy.startupPromises.add(resolve))
   }
   static toggleScript(el){
     let isElement = !!el.tagName;
@@ -639,47 +797,5 @@ export class _ucUtils{
   static get version(){
     return loaderModuleLink.version
   }
-  static windowIsReady(win){
-    if(win && win.isChromeWindow){
-      return new Promise(resolve => {
-        
-        if(loaderModuleLink.variant.FIREFOX){
-          if(win.gBrowserInit.delayedStartupFinished){
-            resolve();
-            return
-          }
-        }else{ // APP_VARIANT = THUNDERBIRD
-          if(win.gMailInit.delayedStartupFinished){
-            resolve();
-            return
-          }
-        }
-        let observer = (subject, topic, data) => {
-          if(subject === win){
-            Services.obs.removeObserver(observer, "browser-delayed-startup-finished");
-            resolve();
-          }
-        };
-        Services.obs.addObserver(observer, "browser-delayed-startup-finished");
-
-      });
-    }else{
-      return Promise.reject(new Error("reference is not a window"))
-    }
-  }
-  static windows = {
-    get: function (onlyBrowsers = true) {
-      let windowType = loaderModuleLink.variant.FIREFOX ? "navigator:browser" : "mail:3pane";
-      let windows = Services.wm.getEnumerator(onlyBrowsers ? windowType : null);
-      let wins = [];
-      while (windows.hasMoreElements()) {
-        wins.push(windows.getNext());
-      }
-      return wins
-    },
-    forEach: function(fun,onlyBrowsers = true){
-      let wins = this.get(onlyBrowsers);
-      wins.forEach((w)=>(fun(w.document,w)))
-    }
-  }
+  static windows = windowUtils
 }

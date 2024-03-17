@@ -28,7 +28,7 @@ const PROMISES = [
   }).expect("Firefox Nightly"),
   
   new Test("non_background_mjs_fallback_windows_length",()=>{
-    return importedUCUtils.windows.get(false).length > 0
+    return importedUCUtils.windows.getAll(false).length > 0
   }).expect(true),
 ];
 

@@ -2,7 +2,7 @@ import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 import { FileSystem as FS } from "chrome://userchromejs/content/fs.sys.mjs";
 import { _ucUtils as utils, loaderModuleLink, Pref, SharedGlobal } from "chrome://userchromejs/content/utils.sys.mjs";
 
-const FX_AUTOCONFIG_VERSION = "0.8.9";
+const FX_AUTOCONFIG_VERSION = "0.9.0";
 console.warn( "Browser is executing custom scripts via autoconfig" );
 
 const APP_VARIANT = (() => {
@@ -475,7 +475,7 @@ class UserChrome_js{
       let timeout = window.setTimeout(() => {
         maybeShowBrokenNotification(window);
       },5000);
-      utils.windowIsReady(window)
+      utils.windows.waitWindowLoading(window)
       .then(() => {
         // startup is fine, clear timeout
         window.clearTimeout(timeout);
@@ -574,7 +574,7 @@ class UserChrome_js{
     return
   }
   observe(aSubject, aTopic, aData) {
-    aSubject.addEventListener('DOMContentLoaded', this, true);
+    aSubject.addEventListener('DOMContentLoaded', this, {once: true, capture: true});
   }
   
   handleEvent(aEvent){
