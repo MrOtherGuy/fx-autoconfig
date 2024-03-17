@@ -170,7 +170,7 @@ directory using chrome url.
 
 # API
 
-This manager is NOT entirely compatible with all existing userScripts - specifically scripts that expect a global `_uc` object or something similar to be available. This manager does export a `_ucUtils` object to window objects which is described in [Utils section]("#Utils").
+This manager is NOT entirely compatible with all existing userScripts - specifically scripts that expect a global `_uc` object or something similar to be available. This manager does export a `_ucUtils` object to window objects which is described in [Utils section](#utils).
 
 ## Script scope
 
@@ -460,6 +460,8 @@ This method will throw if:
 
 ### \_ucUtils.registerHotkey(details,function) -> Boolean
 
+> Deprecated in 0.9.0 - use [_ucUtils.hotkeys.define()](#_ucutilshotkeysdefinedetails---Hotkey) instead
+
 ```js
 // description for hotkey Ctrl + Shift + G
 let details = {
@@ -487,6 +489,57 @@ Valid key values are `A-Z` `a-z` `-` and function keys `F1`-`F12`.
 The created hotkey will override built-in hotkeys.
 
 The id field in the details object should have some unique value, but this is not enforced.
+
+### \_ucUtils.hotkeys.define(details) -> Hotkey
+
+> New in 0.9.0
+
+```js
+// description for hotkey Ctrl + Shift + G
+let details = {
+  id: "myHotkey",
+  modifiers: "ctrl shift",
+  key: "G",
+  command: (window,commandEvent) => console.log("Hello from " + window.document.title);
+}
+
+let myKey = _ucUtils.hotkeys.define(details);
+// myKey will be a instance of Hotkey description object 
+```
+
+If `command` is a function then a new `<command>` element will be created for it with an `id` attribute derived from the specified id. If `command` is a string then the hotkey will simply invoke a command matching that string - either a built-in command name or an id of the to-be-invoked <command>. 
+
+`hotkeys.define()` simply creates a definition for the hotkey, but it does not add it to any window. The Hotkey instance will have methods you can use to do that:
+
+```
+{
+  trigger: Object - description for to-be-generated <key> element
+  command: Object - description for to-be-generated <command> element
+  matchingSelector: string 
+  attachToWindow(window,opt) - creates a <key> and <command> elements to specified window
+  autoAttach(opt) - adds hotkey to all current (main) windows as well as all newly created ones
+  suppressOriginalKey(window) - Disables the original `<key>` for this hotkey
+  restoreOriginalKey(window) - Re-enables the original `<key>` if it was disabled 
+}
+```
+
+The optional `opt` object on `attachToWindow(_,opt)` and `autoAttach(opt)` is a simple dictionary which can be used to run suppressOriginalKey() automatically:
+
+*Note:* `attachToWindow()` is asynchronous method - this is so that we don't add the elements to DOM during window creation, but only after it is ready.
+
+```js
+
+let details = {
+  id: "myHotkey",
+  modifiers: "ctrl",
+  key: "T",
+  command: (window,commandEvent) => console.log("Hello from " + window.document.title);
+}
+
+_ucUtils.hotkeys.define(details).autoAttach({suppressOriginalKey: true});
+// This defines the key `Ctrl+T`, attaches it to all current and future main browser windows and disables original newtab key.
+
+```
 
 
 ### \_ucUtils.getScriptData(aFilter) -> Array | ScriptInfo
@@ -550,7 +603,9 @@ console.log(styleInfo.name, styleInfo.chromeURI);
 
 Returns an object to interact with windows with two properties
 
-#### \_ucUtils.windows.get(onlyBrowsers) -> Array
+#### \_ucUtils.windows.getAll(onlyBrowsers) -> Array
+
+> Renamed from .get() to .getAll() in 0.9.0
 
 Return a list of handles for each window object for this firefox instance. If `onlyBrowsers` is `true` then this only includes browser windows. If it's `false` then it also includes consoles, PiP, non-native notifications etc.
 
@@ -565,6 +620,61 @@ _ucUtils.windows.forEach((document,window) => console.log(document.location), fa
 Runs the specified function for each window. The function will be given two arguments - reference to the document of the window and reference to the window object itself.
 
 **Note!** `_ucUtils` may not be available on all target window objects if onlyBrowsers is `false`. The callback function should check for it's availability when called that way.
+
+#### \_ucUtils.windows.getLastFocused(?windowType) -> Window
+
+> New in 0.9.0
+
+Returns the last focused window. If windowType is undefined then returns `"navigator:browser"` window (eg. main browser window) on Firefox or `"mail:3pane"` window on Thunderbird.
+
+#### \_ucUtils.windows.isBrowserWindow(window) -> Bool
+
+> New in 0.9.0
+
+Returns `true`/`false` indicating if the argument window is a main browser window.
+
+#### \_ucUtils.windows.waitWindowLoading(window) -> Promise<Window>
+
+> New in 0.9.0
+
+Returns a `Promise` which resolves when it has finished its initialization work. Scripts are normally injected on `DOMContentLoaded` event, but lots of initialization has not happened yet.
+
+```js
+_ucUtils.windows.waitWindowLoading(window)
+.then(win => {
+  console.log(win.document.title + " has finished loading")
+})
+```
+
+#### \_ucUtils.windows.onCreated(callback)
+
+> New in 0.9.0
+
+Registers the `callback` function to be called when a new window has been opened. The callback is executed on `DOMContentLoaded` event. Perhaps not useful for normal scripts, but can be an easy way for a background-script to do work when window is created:
+
+```js
+// ==UserScript==
+// @name           background module script
+// @description    my filename is background.sys.mjs
+// ==/UserScript==
+
+import { windowUtils, Hotkey } from "chrome://userchromejs/content/utils/utils.sys.mjs";
+
+let counter = 0;
+
+windowUtils.onCreated(win => {
+  counter++
+});
+
+Hotkey.define({
+  id: "myHotkey",
+  modifiers: "ctrl shift",
+  key: "F",
+  command: () => console.log("Windows opened until now:", counter)
+}).autoAttach()
+
+``` 
+
 
 ### \_ucUtils.toggleScript(fileName or element) -> Object or null
 
@@ -616,6 +726,8 @@ _ucUtils.startupFinished()
 Returns a promise that will be resolved when all windows have been restored during session startup. If all windows have already been restored at the time of calling the promise will be resolved immediately.
 
 ### \_ucUtils.windowIsReady() -> Promise
+
+> Deprecated since 0.9.0 - use [windows.waitWindowLoading()]#_ucutilswindowswaitwindowloadingwindow---promisewindow) 
 
 ```js
 _ucUtils.windowIsReady(window)
