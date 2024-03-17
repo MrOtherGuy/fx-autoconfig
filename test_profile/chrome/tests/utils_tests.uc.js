@@ -546,7 +546,7 @@ console.log("hello world!")
 
   new Test(
     "hotkeys.define",
-    () => {
+    async () => {
       let details = {
         id: "myHotkey",
         modifiers: "ctrl shift",
@@ -555,10 +555,11 @@ console.log("hello world!")
       };
       let hk = _ucUtils.hotkeys.define(details);
       hk.attachToWindow(window);
+      await _ucUtils.windows.waitWindowLoading(window);
       let key = document.getElementById("myHotkey");
       return key.getAttribute("modifiers") + "," + key.getAttribute("key")+","+hk.matchingSelector;
     }
-  ).expect('accel,shift,Y,key[modifiers="accel,shift"][key="Y"]'),
+  ).expectAsync('accel,shift,Y,key[modifiers="accel,shift"][key="Y"]'),
 
   // TODO loadURI
 

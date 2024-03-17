@@ -31,7 +31,8 @@ export class Hotkey{
       windowUtils.isBrowserWindow(win) && this.attachToWindow(win,{suppressOriginal: suppress})
     })
   }
-  attachToWindow(window,opt = {}){
+  async attachToWindow(window,opt = {}){
+    await windowUtils.waitWindowLoading(window);
     if(opt.suppressOriginal){
       this.suppressOriginalKey(window)
     }
