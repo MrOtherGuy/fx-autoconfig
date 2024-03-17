@@ -601,7 +601,7 @@ console.log(styleInfo.name, styleInfo.chromeURI);
 
 ### \_ucUtils.windows -> Object
 
-Returns an object to interact with windows with two properties
+Returns an object to interact with windows
 
 #### \_ucUtils.windows.getAll(onlyBrowsers) -> Array
 
@@ -727,7 +727,7 @@ Returns a promise that will be resolved when all windows have been restored duri
 
 ### \_ucUtils.windowIsReady() -> Promise
 
-> Deprecated since 0.9.0 - use [windows.waitWindowLoading()]#_ucutilswindowswaitwindowloadingwindow---promisewindow) 
+> Deprecated since 0.9.0 - use [windows.waitWindowLoading()](#_ucutilswindowswaitwindowloadingwindow---promisewindow) 
 
 ```js
 _ucUtils.windowIsReady(window)
