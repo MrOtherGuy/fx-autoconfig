@@ -128,7 +128,7 @@ class ScriptData {
       return aScript.#preCompiling
     }
     aScript.#preCompiling = new Promise( resolve => {
-      ChromeUtils.compileScript(`data:,"use strict";import("${aScript.chromeURI.spec}").catch(console.error)`)
+      ChromeUtils.compileScript(`data:,"use strict";import("${aScript.chromeURI.spec}").then(() => {if(${!!aScript.startup}){ _ucUtils.sharedGlobal.${aScript.startup}._startup(window) }}).catch(e=>{ throw new Error(e.message,"${aScript.filename}",e.lineNumber) })`)
       .then( script => {
         aScript.#preCompiledESM = script;
         resolve(script);
@@ -203,8 +203,12 @@ class ScriptData {
   static injectESMIntoGlobal(aScript,aGlobal){
     return new Promise((resolve,reject) => {
       ScriptData.preCompileMJS(aScript)
-      .then(script => script && script.executeInGlobal(aGlobal))
-      .then(() => ScriptData.markScriptRunning(aScript,aGlobal))
+      .then(script => {
+        if(script){
+          script.executeInGlobal(aGlobal);
+          aScript.#isRunning = true;
+        }
+      })
       .then(resolve)
       .catch( ex => {
         aScript.#injectionFailed = true;
@@ -225,7 +229,6 @@ class ScriptData {
       return Promise.resolve(1)
     }catch(ex){
       aScript.#injectionFailed = true;
-      ScriptData.markScriptRunning(aScript,aGlobal)
       return Promise.reject(ex)
     }
   }
