@@ -391,6 +391,7 @@ class UserChrome_js{
     this.GBROWSERHACK_ENABLED = 
       (Services.prefs.getBoolPref("userChromeJS.gBrowser_hack.required",false) ? 2 : 0)
     + (Services.prefs.getBoolPref("userChromeJS.gBrowser_hack.enabled",false) ? 1 : 0);
+
     const disabledScripts = getDisabledScripts();
     // load script data
     const scriptDir = FS.getScriptDir();
@@ -405,10 +406,10 @@ class UserChrome_js{
             try{
               if(script.isESM){
                 ChromeUtils.importESModule( script.chromeURI.spec );
+                ScriptData.markScriptRunning(script,null);
               }else{
-                ChromeUtils.import( script.chromeURI.spec );
+                console.warn("Refusing to import legacy jsm style module: ",script.filename);
               }
-              ScriptData.markScriptRunning(script,null);
             }catch(ex){
               console.error(new Error(`@ ${script.filename}`,{cause:ex}));
             }
