@@ -1033,7 +1033,9 @@ UC_API.Windows.waitWindowLoading(window)
 })
 ```
 
-[UC_API.Windows](#Windows)
+### Difference of `Runtime.startupFinished()` and `Windows.waitWindowLoading()`
+
+Since scripts run per window, `startupFinished` will be resolved once in *each window that called it* when ALL those windows have been restored. But `waitWindowLoading` will be resolved whenever the particular window that calls it has started up.
 
 # Startup Error
 
