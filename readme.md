@@ -10,9 +10,11 @@ Since the files in `program` go to the main program installation path, they will
 
 However, the bulk of the logic is located in profile folder with `boot.sys.mjs` so if the file is not found there then the loader is simply not used.
 
-The loader module (`boot.sys.mjs`) depends on two additional files: `utils.sys.mjs` to which is collection of various helper functions you can use in your scripts and `fs.sys.mjs` to implement read and write operations on the file system.
+The loader module (`boot.sys.mjs`) depends on two additional files: `utils.sys.mjs` to which is collection of various helper functions you can use in your scripts and `fs.sys.mjs` to implement read and write operations on the file system. Version "0.10.0" also added new `uc_api.sys.mjs` file which as an interface that scripts should import instead of importing utils.sys.mjs directly.
 
 **Note** as of version "0.8" fx-autoconfig is incompatible with Firefox ESR 102
+
+**Note** version "0.10.0" deprecated old `_ucUtils` symbol in favor of new `UC_API` so expect breakage if upgrading from older versions.
 
 ## Warning!
 
@@ -85,12 +87,13 @@ home.packages = with pkgs; [
 Copy the contents of the folder "profile" (not the folder itself) to the Firefox profile folder that you want to modify. If the profile already has a `chrome` folder (for userChrome.css or userContent.css) then the chrome folders should merge. Otherwise the chrome folder will be created.
 You should end up with `chrome` folder in the profile root, and three folders inside it - JS, resources and utils.
 
-There will be three files in the `chrome/utils/` folder:
+There will be four files in the `chrome/utils/` folder:
 
 * `chrome.manifest` - registers file paths to chrome:// protocol
 * `boot.sys.mjs` - implements user-script loading logic
 * `fs.jsm` - implements filesystem-related functions - `boot.sys.mjs` uses this file internally.
 * `utils.sys.mjs` - implements various functions used by `utils.sys.mjs` and which your scripts can also use
+* (new in 0.10.0) `uc_api.sys.mjs` - helper API, making importing methods from `utils.sys.mjs` easier 
 
 ## Deleting startup-cache
 
@@ -129,7 +132,7 @@ The loader module `boot.sys.mjs` looks for three kinds of files in your scripts 
 * `<filename>.uc.mjs` (new in 0.8) - script which will be loaded into target documents asynchronously as ES6 module.
 * `<filename>.sys.mjs` - module script which will be loaded into global context synchronously once on startup
 
-Additionally (".uc.js") scripts can be marked as background-module by tagging them with `@backgroundmodule` in the script header.
+Additionally (".uc.js") scripts can be marked as background-module by tagging them with `@backgroundmodule` in the script header. `(Deprecated in 0.10.0)`
 
 Just put any such files into the `JS` directory. The `JS` directory should be in the same directory where userChrome.css would be. If you wish to change the directory name then you need to modify the `chrome.manifest` file inside `utils` directory. For example change `../JS/` to `../scripts/` to make Firefox load scripts from "scripts" folder.
 
@@ -170,7 +173,9 @@ directory using chrome url.
 
 # API
 
-This manager is NOT entirely compatible with all existing userScripts - specifically scripts that expect a global `_uc` object or something similar to be available. This manager does export a `_ucUtils` object to window objects which is described in [Utils section](#utils).
+This manager is NOT entirely compatible with all existing userScripts - specifically scripts that expect a global `_uc` object or something similar to be available. This manager does export a `_ucUtils` object to window objects which is described in [api definition section](#uc_api).
+
+Additionally, version `0.10.0` is very much incompatible with earlier versions, because `_ucUtils` is replaced with `UC_API`.
 
 ## Script scope
 
@@ -214,6 +219,8 @@ Some convenience functions are provided for scripts to use in global `_ucUtils` 
 
 ## @backgroundmodule
 
+> (Deprecated in 0.10.0) - use ES6 modules (.sys.mjs files) instead.
+
 Scripts can be marked as background modules by including a `@backgroundmodule` line in script header. See example:
 
 ```js
@@ -250,16 +257,18 @@ Some.doThing();
 
 The manager loads any `.sys.mjs` files always as backgroundmodule - in addition they are loaded as ES6 modules which means you can use static `import` and `export` declarations inside them.
 
-You should note that background modules do not have access to window objects when they are being run because they are executed before any window exists. Thus, they also do not automaticalle get access to `_ucUtils` object.
+You should note that background modules do not have access to window objects when they are being run because they are executed before any window exists. Thus, they also do not automatically get access to `_ucUtils` or `UC_API` objects.
 
-As of version `0.8` ES6 module scripts, including backgroundmodules (so `.sys.mjs` and `.uc.mjs` files) can import `_ucUtils` like this:
+As of version `0.8` ES6 module scripts, including backgroundmodules (so `.sys.mjs` and `.uc.mjs` files) can import `UC_API` like this:
 
 ```js
-import { _ucUtils } from "chrome://userchromejs/content/utils.sys.mjs";
+import * from "chrome://userchromejs/content/uc_api.sys.mjs";
 ```
 Although window scoped module scripts (.uc.mjs) automatically gain access to it anyway from the window object.
 
 ### import heads-up
+
+(This section only applies to pre 0.10.0 versions and somewhat if you try to import utils.sys.mjs directly)
 
 **Note for .uc.mjs scripts!**
 Because your script is running in its own module scope within a window the module imported with an `import` statement above is NOT the same instance of the object as what you would get automatically via `_ucUtils`. The methods within are the same, but since it is a different object its internal properties have not been initialized by `boot.sys.mjs` so some functionality is missing - such as access to custom script info via `.getScriptData()`
@@ -360,6 +369,8 @@ console.log("Hello world!") // This is only run in the first window that opens.
 
 ## @startup
 
+> (Deprecated in 0.10.0) - use [Windows.onCreated](#windowsoncreated-callback-) instead
+
 Scripts can define a function to be executed when they are loaded in the header portion of the script. Consider the following header:
 
     // ==UserScript==
@@ -406,22 +417,484 @@ Tells the loader to register this style using its `file:///` url instead of `chr
 
 Note that some CSS features may not be available for file:// uri styles. However, chrome:// styles cannot be modified using devtools, while file:// uri styles can be.
 
-# Utils
+# UC\_API
 
-## General
+For pre 0.10.0 definitions you can check separate file available at [uc_utils_old.md](./uc_utils_old.md).
 
-### \_ucUtils.createElement(document,tagname,attributes,isHTML) -> Element
+Helpers are available as a namespace object - the whole namespace can be imported to module scripts as follows:
 
 ```js
-_ucUtils.createElement(document,"menuitem",{ id:"someid", class:"aClass", label:"some label" })
+import * from "chrome://userchromejs/content/uc_api.sys.mjs";
+```
+The same namespace is also defined on window objects as `UC_API` symbol that can be used in window scoped scripts.
+
+Or you can import individual namespaces like this:
+
+```js
+import FileSystem from "chrome://userchromejs/content/uc_api.sys.mjs";
+```
+
+Helpers divided into separate namespaces:
+
+* [UC_API.FileSystem](#filesystem)
+* [UC_API.Hotkeys](#hotkeys)
+* [UC_API.Notifications](#notifications)
+* [UC_API.Prefs](#prefs)
+* [UC_API.Runtime](#runtime)
+* [UC_API.Scripts](#scripts)
+* [UC_API.SharedStorage](#sharedstorage)
+* [UC_API.Utils](#utils)
+* [UC_API.Windows](#windows)
+
+## Filesystem
+
+Scripts should generally use the `resources` folder for their files. The helper functions interacting with filesystem expect `resources` to be the root folder for script operations.
+
+The resources folder is registered to chrome:// scheme so scripts and stylesheets can use the following URL to access files within it:
+
+```
+"chrome://userChrome/content/<filename>.txt" 
+```
+
+Scripts folder is registered to: `chrome://userScripts/content/`
+
+The loader module folder is registered to `chrome://userchromejs/content/`
+
+Main idea is that various methods of the FileSystem namespace return a `FileSystemResult` object instead of the actual operation result directly.
+
+The `FileSystemResult` result object is one of four types:
+* `Filesystem.RESULT_FILE` get reference to a file
+* `Filesystem.RESULT_DIRECTORY` get referece to a directory
+* `Filesystem.RESULT_ERROR` non-existent file or other kind of error
+* `Filesystem.RESULT_CONTENT` file read operation results
+
+The result object has various methods to access underlying data.
+
+```js
+// return nsIFile object representing either a file a directory
+// throws if called on CONTENT or ERROR types
+fsResult.entry()
+
+// return the file text content as string
+// throws if called on anything except CONTENT type
+fsResult.content() // returns content that was read 
+
+// return an iterator over files in a directory
+// Note, the individual entries are nsIFile objects, not wrapped `FileSystemResult`s
+// throws when called on anything except DIRECTORY type
+fsResult.entries()
+// entries() is called internally if you try to iterate over the result:
+fsResult = FileSystem.getEntry("my_dir");
+for(let file of fsResult){
+  ...
+}
+
+// size of read content or size of the file on disk
+fsResult.size
+
+// Read the content of this FileSystemResult
+// throws if called on non-FILE type
+let content = await fsResult.read() // Async read
+console.log(content);
+<< "Hello world!"
+
+// throws if called on non-FILE type
+let sync_content = fsResult.readSync();
+console.log(content);
+<< "Hello world!"
+
+// get a file URI for this result
+console.log(fsResult.fileURI)
+<< file:///c:/temp/things/some.txt
+
+// Tries to open a given file entry path in OS file manager.
+// Returns true or false indicating success.
+// Whether this works or not probably depends on your OS.
+// Only tested on Windows 10.
+fsResult.showInFileManager()
+
+```
+
+### FileSystem.getEntry(fileName) -> `FileSystemResult`
+
+```js
+let fsResult = UC_API.FileSystem.getEntry("some.txt");
+result.isFile()
+// true
+
+let nonexistent = UC_API.FileSystem.getEntry("nonexistent.txt");
+nonexistent.isError()
+// true
+
+let dir = UC_API.FileSystem.getEntry("directory");
+dir.isDirectory()
+// true
+```
+
+### FileSystem.readFile(fileName) -> `Promise\<FileSystemResult\>`
+
+Asynchronously read a file. Throws if the argument is not a string
+
+```js
+let fsResult = await UC_API.FileSystem.readFile("some.txt");
+fsResult.isFile()
+// false
+fsResult.isContent()
+// true
+console.log(fsResult.content())
+// "Hello world!"
+```
+
+### FileSystem.readFileSync(some) -> `FileSystemResult`
+
+Synchronously read a file. The argument can be either a string representing filename or referece to a nsIFile object.
+
+```js
+let fsResult = UC_API.FileSystem.readFileSync("some.txt");
+fsResult.isContent()
+// true
+console.log(fsResult.content())
+// "Hello world!"
+```
+
+### FileSystem.readJSON(fileName) -> `Promise\<Object | null\>`
+
+Asynchronously try to read a file and parse it as json. If file can't be parsed then returns `null`.
+
+```js
+let fsResult = await UC_API.FileSystem.readJSON("some.json")
+```
+
+### FileSystem.writeFile(fileName, content, options) -> `Promise\<Number\>`
+
+```js
+let some_content = "Hello world!\n";
+let bytes = await UC_API.FileSystem.writeFile( "hello.txt", some_content );
+console.log(bytes);
+
+<< 13
+```
+
+Write the content into file **as UTF8**. On successful write the promise is resolved with number of written bytes.
+
+By default writing files using this API is only allowed in **resources** directory. Calling `writeFile` with fileName like "../test.txt" will then reject the promise. You must set pref `userChromeJS.allowUnsafeWrites` to `true` to allow writing outside of resources.
+
+**Note!** Currently this method **replaces** the existing file if one exists.
+
+The optional `options` argument is currently only used to pass a filename for temp file. By default it is derived from fileName. 
+
+### FileSystem.chromeDir() -> `FileSystemResult`
+
+Returns `FileSystemResult` with type DIRECTORY for the profile `chrome` directory
+
+```js
+let fsResult = UC_API.FileSystem.chromeDir();
+let uri = fsResult.fileURI // a file:/// uri
+
+for (let file of fsResult){ // equal to fsResult.entries()
+  console.log(file.leafName);
+}
+```
+
+## Hotkeys
+
+### Hotkeys.define(details) -> `Hotkey`
+
+```js
+// description for hotkey Ctrl + Shift + G
+let details = {
+  id: "myHotkey",
+  modifiers: "ctrl shift",
+  key: "G",
+  command: (window,commandEvent) => console.log("Hello from " + window.document.title);
+}
+
+let myKey = UC_API.Hotkeys.define(details);
+// myKey will be a instance of Hotkey description object 
+```
+If `command` is a function then a new `<command>` element will be created for it with an `id` attribute derived from the specified id. If `command` is a string then the hotkey will simply invoke a command matching that string - either a built-in command name or an id of the to-be-invoked <command>. 
+
+`hotkeys.define()` simply creates a definition for the hotkey, but it does not add it to any window. The Hotkey instance will have methods you can use to do that:
+
+```
+{
+  trigger: Object - description for to-be-generated <key> element
+  command: Object - description for to-be-generated <command> element
+  matchingSelector: string 
+  attachToWindow(window,opt) - creates a <key> and <command> elements to specified window
+  autoAttach(opt) - adds hotkey to all current (main) windows as well as all newly created ones
+  suppressOriginalKey(window) - Disables the original `<key>` for this hotkey
+  restoreOriginalKey(window) - Re-enables the original `<key>` if it was disabled 
+}
+```
+
+The optional `opt` object on `attachToWindow(_,opt)` and `autoAttach(opt)` is a simple dictionary which can be used to run suppressOriginalKey() automatically:
+
+*Note:* `attachToWindow()` is asynchronous method - this is so that we don't add the elements to DOM during window creation, but only after it is ready.
+
+```js
+
+let details = {
+  id: "myHotkey",
+  modifiers: "ctrl",
+  key: "T",
+  command: (window,commandEvent) => console.log("Hello from " + window.document.title);
+}
+
+UC_API.Hotkeys.define(details).autoAttach({suppressOriginalKey: true});
+// This defines the key `Ctrl+T`, attaches it to all current and future main browser windows and disables original newtab key.
+
+```
+
+## Notifications
+
+Display and receive input to and from browser notification toolbar (not to be confused with OS notification system)
+
+### UC_API.Notifications.show(details) -> `Promise`
+
+```js
+_ucUtils.showNotification(
+  {
+    label : "Message content",  // text shown in the notification
+    type : "something",         // opt identifier for this notification
+    priority: "info",           // opt one of ["system","critical","warning","info"]
+    window: window.top ,        // opt reference to a chromeWindow
+    tab: gBrowser.selectedTab,  // opt reference to a tab
+    buttons: [...],             // opt array of button descriptors
+    callback: () => {}          // opt function to be called when notification is dismissed
+  }
+)
+```
+Priority defines the ordering and coloring of this notification. Notifications of higher priority are shown before those of lower priority. Priority defaults to "info".
+
+If `window` key exists then the notification will be shown in that window. Otherwise it is shown in the last active window.
+
+If `tab` key exists then the notification will be shown in that tab only. Otherwise the notification is global to the window.
+
+See more about `buttons` and `callback` keys at [notificationbox.js](https://searchfox.org/mozilla-central/rev/3f782c2587124923a37c750b88c5a40108077057/toolkit/content/widgets/notificationbox.js#113)
+
+## Prefs
+
+A shortcut for reading and writing preferences
+
+### Prefs.set(prefName,value) -> `undefined`
+
+```js
+UC_API.Prefs.set("some.pref.path","test");
+UC_API.Prefs.set("some.other.pref",300);
+```
+
+This will `throw` if you try to set a pref to a value of different type than what it currently is (ie. boolean vs. string) unless the pref doesn't exist when this is called.
+This will also throw if you try to set the pref with value that is not one of `number, string, boolean` - number is also converted to integer.
+
+### Prefs.get(prefName) -> `Pref`
+
+Returns a representation of the pref wrapped into an object with properties:
+
+```js
+let myPref = UC_API.Prefs.get("userChrome.scripts.disabled");
+/*
+* {
+*   exists() // true|false indicating if this pref exists
+*   name     // string - the called pref name
+*   value    // <number|string|boolean> | `null` - null means pref with this name could not be read
+* set value() // same as _ucUtils.prefs.set(name,value)
+*   hasUserValue() // true|false indicating if this has user set value
+*   type     // "string"|"boolean"|"number"|"invalid"
+*   reset()  // resets this pref to its default value
+* }
+*/
+
+myPref.exists()
+// false - "userChrome.scripts.disabled" does not exist
+```
+
+
+### Prefs.addListener(prefName,callback) -> `Object`
+
+```js
+let callback = (value,pref) => (console.log(`${pref} changed to ${value}`))
+let prefListener = UC_API.Prefs.addListener("userChromeJS",callback);
+```
+
+Note that the callback will be invoked when any pref that starts with `userChromeJS` is changed. The pref in callback argument will be a `Pref` object wrapping the value of the actual pref whose value was changed.
+
+### Prefs.removeListener(listener)
+
+```
+UC_API.Prefs.removeListener(prefListener) // from above example
+```
+
+Pref class can also be imported directly to module scripts like this:
+
+```js
+import { Pref } from "chrome://userchromejs/content/utils.sys.mjs";
+```
+
+## Runtime
+
+Provides general information about the loader and state of the browser.
+
+### Runtime.appVariant -> `String ["Firefox" | "Thunderbird"]`
+
+### Runtime.brandName -> `String`
+Brand name of the browser eg. "Firefox", "Firefox Nightly" etc.
+
+### Runtime.config -> `null`
+Perhaps to be used in the future
+
+### Runtime.loaderVersion -> `String`
+The version string of `boot.sys.mjs` 
+
+### Runtime.restart(clearCache)
+
+Immediately restart the browser. If the boolean `clearCache` is `true` then Firefox will invalidate startupCache which allows changes to the enabled scripts to take effect. A closing prompt is shown if some other part of the browser such as a website would need a confirmation about restart.
+
+### Runtime.startupFinished() -> `Promise\<>`
+
+```js
+UC_API.Runtime.startupFinished()
+.then(()=>{
+  console.log("startup done");
+});
+```
+
+Returns a promise that will be resolved when all windows have been restored during session startup. If all windows have already been restored at the time of calling the promise will be resolved immediately.
+
+## Scripts
+Provide information about registered scripts and styles and some controls for them.
+
+### Scripts.getScriptData(aFilter) -> `Array\<ScriptInfo>` | `ScriptInfo`
+
+Returns `ScriptInfo` object(s) with a **copy** of their metadata. This includes scripts that are not yet running or which are disabled by pref.
+
+When called without arguments returns an array of `ScriptInfo` objects describing your scripts.
+
+```js
+let scripts = UC_API.Scripts.getScriptData(); 
+for(let script of scripts){
+  console.log(`${script.filename} - @{script.isEnabled} - ${script.isRunning}`)
+}
+```
+
+If the first argument is a `string` then this returns **a single** `ScriptInfo` object for a script that had the specified filename. If such script is not found then `null` is returned.
+
+```js
+let script = UC_API.Scripts.getScriptData("my-script.uc.js");
+console.log(`@{script.name} - ${script.isRunning}`);
+```
+
+If the first argument is a function, then this function returns a filtered list of scripts that return `true` when the function is run on them:
+
+```js
+let scripts = UC_API.Scripts.getScriptData(s => s.isRunning);
+console.log(`You have ${scripts.length} running scripts);
+// This is essentially the same as UC_API.Scripts.getScriptData().filter(s => s.isRunning)
+```
+
+**Note!** If the first argument is anything other than a function or a string, then `getScriptData()` will throw an error.
+
+### Scripts.getStyleData(aFilter) -> `Array\<ScriptInfo>` | `ScriptInfo`
+
+Mechanically exactly the same as `getScriptData()` but returns styles instead of scripts.
+
+### Scripts.getScriptMenuForDocument() -> `Element`
+Returns the `<menu>` element created for controlling scripts. In Firefox this is inside Menubar > Tools.
+
+**Note!** The menu is lazily generated and calling this method should cause it to be generated if it isn't already.
+
+### Scripts.openScriptDir -> `Boolean`
+
+```js
+UC_API.Scripts.openScriptDir();
+```
+
+Tries to open your script directory in OS file manager. Returns true or false indicating success. Whether this works or not probably depends on your OS. Only tested on Windows 10.
+
+### Scripts.openStyleDir -> `Boolean`
+
+```js
+UC_API.Scripts.openStyleDir();
+```
+
+Tries to open your style directory in OS file manager. Returns true or false indicating success. Whether this works or not probably depends on your OS. Only tested on Windows 10.
+
+### Scripts.parseStringAsScriptInfo(aName, aString, parseAsStyle) -> `ScriptInfo`
+
+This can be used to construct a `ScriptInfo` object from arbitrary string following the same logic the loader uses internally. When given `aName` as "filename" the `aString` is parsed just like script metadata block in your files. optional `parseAsStyle` argument, when truthy, makes the method parse `aString` as style instead of a script.
+
+```js
+let myMetadataBlock = `// ==UserScript==
+// @name           my-test-info
+// @description    Constructed ScriptInfo
+// ==/UserScript==
+`;
+
+let scriptInfo = UC_API.Scripts.parseStringAsScriptInfo("fakeFileName", myMetadataBlock);
+console.log(scriptInfo.name, scriptInfo.chromeURI);
+// "my-test-info chrome://userscripts/content/fakeFileName"
+
+let styleInfo = UC_API.Scripts.parseStringAsScriptInfo("fakeFileName", myMetadataBlock, true);
+console.log(styleInfo.name, styleInfo.chromeURI);
+// "my-test-info chrome://userstyles/skin/fakeFileName"
+
+```
+
+**Note!** There needs to be a new-line after the closing `// ==/UserScript==` "tag" for the metadata to be parsed correctly.
+
+### Scripts.toggleScript(fileName or element) -> Object | null
+
+filename:
+
+```js
+UC_API.Scripts.toggleScript("test.uc.js")
+```
+
+Element where `this` is a menuitem:
+
+```js
+UC_API.Scripts.toggleScript(this);
+```
+
+If the argument is an element the function reads a `filename` attribute from the element and uses that. Toggles the specified script, note that browser restart is required for changes to take effect.
+
+The return value is `null` if a matching script was not found. Otherwise, the return value is an object `{ script: filename, enabled: true|false }`
+
+### Scripts.reloadStyleSheet(name, sheet_mode) -> `Boolean`
+
+```js
+UC_API.Scripts.updateStyleSheet() // reloads userChrome.css
+
+ // reloads a style in author-mode stylesheets list with matching name
+UC_API.Scripts.updateStyleSheet("userChrome.au.css","author")
+
+ // reloads a style in agent-mode stylesheets list with matching name
+UC_API.Scripts.updateStyleSheet("userChrome.ag.css","agent")
+```
+
+Argument `filename` is relative to `resources` folder, but you can use `../` prefix to get back to `chrome` folder.
+
+Note, you can't reload a style that is in one sheet-mode list into another sheet-mode. Such as, you cannot use this to reload userChrome.css into agent-mode list.
+
+Return value true/false indicates wheter a style file with specified name was found in the corresponding list.
+
+If the specified stylesheet imports other files, then calling this will also reload any of those imported files. However, in experience it might be that reload of imported stylesheets does not take effect until a new window is created.
+
+## Utils
+Few DOM manipulation helpers for creating elements etc.
+
+### Utils.createElement(document,tagname,attributes,isHTML) -> `Element`
+
+```js
+UC_API.Utils.createElement(document,"menuitem",{ id:"someid", class:"aClass", label:"some label" })
 ```
 
 Attaches a new element with tagname to the given document and adds it attributes from attributes object. isHTML is a boolean indicating whether the element is XUL element or HTML element - defaults to false.
 
-### \_ucUtils.createWidget(details) -> `<Widget wrapper object>`
+### UC_API.Utils.createWidget(details) -> `<Widget wrapper object>`
 
 ```js
-_ucUtils.createWidget({
+UC_API.Utils.createWidget({
   id: "funk-item",                // required
   type: "toolbaritem",            // ["toolbaritem","toolbarbutton"]  
   label: "funky2",                // opt (uses id when missing)
@@ -458,246 +931,13 @@ This method will throw if:
 * `type` is anything except `"toolbaritem"` or `"toolbarbutton"`
 * A widget with same id already exists. For example if a script which calls this method is executed in multiple Firefox windows then the first one should succeed, but successive calls should throw an Error.
 
-### \_ucUtils.registerHotkey(details,function) -> Boolean
+### Utils.escapeXUL(string) -> `String`
+Escapes xul markup in case you need to add strings to the UI
 
-> Deprecated in 0.9.0 - use [_ucUtils.hotkeys.define()](#_ucutilshotkeysdefinedetails---Hotkey) instead
-
-```js
-// description for hotkey Ctrl + Shift + G
-let details = {
-  id: "myHotkey",
-  modifiers: "ctrl shift",
-  key: "G"
-}
-
-function onHotkey(window,hotkey){
-  console.log(hotkey);
-  // prints id, modifiers and key of the pressed hotkey.
-  // window is the window-object that captured this hotkey
-}
-
-let success = _ucUtils.registerHotkey(details,onHotkey);
-
-```
-
-Register a hotkey handler to each browser window. registerHotkey returns `true` if the hotkey was registered correctly. `false` if there was a problem. 
-`id`,`modifiers` and `key` fields are mandatory and must be String type.
-
-The function only supports modifiers `"alt"`, `"shift"`, `"ctrl"`, `"meta"` and `"accel"` modifiers.
-Valid key values are `A-Z` `a-z` `-` and function keys `F1`-`F12`.
-
-The created hotkey will override built-in hotkeys.
-
-The id field in the details object should have some unique value, but this is not enforced.
-
-### \_ucUtils.hotkeys.define(details) -> Hotkey
-
-> New in 0.9.0
+### Utils.loadURI(window,details) -> boolean
 
 ```js
-// description for hotkey Ctrl + Shift + G
-let details = {
-  id: "myHotkey",
-  modifiers: "ctrl shift",
-  key: "G",
-  command: (window,commandEvent) => console.log("Hello from " + window.document.title);
-}
-
-let myKey = _ucUtils.hotkeys.define(details);
-// myKey will be a instance of Hotkey description object 
-```
-
-If `command` is a function then a new `<command>` element will be created for it with an `id` attribute derived from the specified id. If `command` is a string then the hotkey will simply invoke a command matching that string - either a built-in command name or an id of the to-be-invoked <command>. 
-
-`hotkeys.define()` simply creates a definition for the hotkey, but it does not add it to any window. The Hotkey instance will have methods you can use to do that:
-
-```
-{
-  trigger: Object - description for to-be-generated <key> element
-  command: Object - description for to-be-generated <command> element
-  matchingSelector: string 
-  attachToWindow(window,opt) - creates a <key> and <command> elements to specified window
-  autoAttach(opt) - adds hotkey to all current (main) windows as well as all newly created ones
-  suppressOriginalKey(window) - Disables the original `<key>` for this hotkey
-  restoreOriginalKey(window) - Re-enables the original `<key>` if it was disabled 
-}
-```
-
-The optional `opt` object on `attachToWindow(_,opt)` and `autoAttach(opt)` is a simple dictionary which can be used to run suppressOriginalKey() automatically:
-
-*Note:* `attachToWindow()` is asynchronous method - this is so that we don't add the elements to DOM during window creation, but only after it is ready.
-
-```js
-
-let details = {
-  id: "myHotkey",
-  modifiers: "ctrl",
-  key: "T",
-  command: (window,commandEvent) => console.log("Hello from " + window.document.title);
-}
-
-_ucUtils.hotkeys.define(details).autoAttach({suppressOriginalKey: true});
-// This defines the key `Ctrl+T`, attaches it to all current and future main browser windows and disables original newtab key.
-
-```
-
-
-### \_ucUtils.getScriptData(aFilter) -> Array | ScriptInfo
-
-Returns `ScriptInfo` object(s) with a **copy** of their metadata. This includes scripts that are not yet running or which are disabled by pref.
-
-When called without arguments returns an array of `ScriptInfo` objects describing your scripts.
-
-```js
-let scripts = _ucUtils.getScriptData(); 
-for(let script of scripts){
-  console.log(`${script.filename} - @{script.isEnabled} - ${script.isRunning}`)
-}
-```
-
-If the first argument is a `string` then this returns **a single** `ScriptInfo` object for a script that had the specified filename. If such script is not found then `null` is returned.
-
-```js
-let script = _ucUtils.getScriptData("my-script.uc.js");
-console.log(`@{script.name} - ${script.isRunning}`);
-```
-
-If the first argument is a function, then this function returns a filtered list of scripts that return `true` when the function is run on them:
-
-```js
-let scripts = _ucUtils.getScriptData(s => s.isRunning);
-console.log(`You have ${scripts.length} running scripts);
-// This is essentially the same as _ucUtils.getScriptData().filter(s => s.isRunning)
-```
-
-**Note!** If the first argument is anything other than a function or a string, then `getScriptData()` will throw an error.
-
-### \_ucUtils.getStyleData(aFilter) -> Array | ScriptInfo
-
-Mechanically exactly the same as `getScriptData()` but returns styles instead of scripts.
-
-### \_ucUtils.parseStringAsScriptInfo(aName, aString, parseAsStyle) -> ScriptInfo
-
-This can be used to construct a `ScriptInfo` object from arbitrary string following the same logic the loader uses internally. When given `aName` as "filename" the `aString` is parsed just like script metadata block in your files. optional `parseAsStyle` argument, when truthy, makes the method parse `aString` as style instead of a script.
-
-```js
-let myMetadataBlock = `// ==UserScript==
-// @name           my-test-info
-// @description    Constructed ScriptInfo
-// ==/UserScript==
-`;
-
-let scriptInfo = _ucUtils.parseStringAsScriptInfo("fakeFileName", myMetadataBlock);
-console.log(scriptInfo.name, scriptInfo.chromeURI);
-// "my-test-info chrome://userscripts/content/fakeFileName"
-
-let styleInfo = _ucUtils.parseStringAsScriptInfo("fakeFileName", myMetadataBlock, true);
-console.log(styleInfo.name, styleInfo.chromeURI);
-// "my-test-info chrome://userstyles/skin/fakeFileName"
-
-```
-
-**Note!** There needs to be a new-line after the closing `// ==/UserScript==` "tag" for the metadata to be parsed correctly.
-
-### \_ucUtils.windows -> Object
-
-Returns an object to interact with windows
-
-#### \_ucUtils.windows.getAll(onlyBrowsers) -> Array
-
-> Renamed from .get() to .getAll() in 0.9.0
-
-Return a list of handles for each window object for this firefox instance. If `onlyBrowsers` is `true` then this only includes browser windows. If it's `false` then it also includes consoles, PiP, non-native notifications etc.
-
-`onlyBrowsers` defaults to `true`.
-
-#### \_ucUtils.windows.forEach(function,onlyBrowsers)
-
-```js
-_ucUtils.windows.forEach((document,window) => console.log(document.location), false)
-```
-
-Runs the specified function for each window. The function will be given two arguments - reference to the document of the window and reference to the window object itself.
-
-**Note!** `_ucUtils` may not be available on all target window objects if onlyBrowsers is `false`. The callback function should check for it's availability when called that way.
-
-#### \_ucUtils.windows.getLastFocused(?windowType) -> Window
-
-> New in 0.9.0
-
-Returns the last focused window. If windowType is undefined then returns `"navigator:browser"` window (eg. main browser window) on Firefox or `"mail:3pane"` window on Thunderbird.
-
-#### \_ucUtils.windows.isBrowserWindow(window) -> Bool
-
-> New in 0.9.0
-
-Returns `true`/`false` indicating if the argument window is a main browser window.
-
-#### \_ucUtils.windows.waitWindowLoading(window) -> Promise<Window>
-
-> New in 0.9.0
-
-Returns a `Promise` which resolves when it has finished its initialization work. Scripts are normally injected on `DOMContentLoaded` event, but lots of initialization has not happened yet.
-
-```js
-_ucUtils.windows.waitWindowLoading(window)
-.then(win => {
-  console.log(win.document.title + " has finished loading")
-})
-```
-
-#### \_ucUtils.windows.onCreated(callback)
-
-> New in 0.9.0
-
-Registers the `callback` function to be called when a new window has been opened. The callback is executed on `DOMContentLoaded` event. Perhaps not useful for normal scripts, but can be an easy way for a background-script to do work when window is created:
-
-```js
-// ==UserScript==
-// @name           background module script
-// @description    my filename is background.sys.mjs
-// ==/UserScript==
-
-import { windowUtils, Hotkey } from "chrome://userchromejs/content/utils/utils.sys.mjs";
-
-let counter = 0;
-
-windowUtils.onCreated(win => {
-  counter++
-});
-
-Hotkey.define({
-  id: "myHotkey",
-  modifiers: "ctrl shift",
-  key: "F",
-  command: () => console.log("Windows opened until now:", counter)
-}).autoAttach()
-
-``` 
-
-
-### \_ucUtils.toggleScript(fileName or element) -> Object or null
-
-filename:
-
-```js
-_ucUtils.toggleScript("test.uc.js")
-```
-
-Element where `this` is a menuitem:
-
-```js
-_ucUtils.toggleScript(this);
-```
-
-If the argument is an element the function reads a `filename` attribute from the element and uses that. Toggles the specified script, note that browser restart is required for changes to take effect.
-
-The return value is `null` if a matching script was not found. Otherwise, the return value is an object `{ script: filename, enabled: true|false }`
-
-### \_ucUtils.loadURI(window,details) -> boolean
-
-```js
-_ucUtils.loadURI(window,{
+UC_API.Utils.loadURI(window,{
   url:"about:config",
   where:"tab",        // one of ["current","tab","tabshifted","window"]
   private: true,      // should the window be private
@@ -710,310 +950,90 @@ _ucUtils.loadURI(window,{
 
 Return a boolean indicating if the operation was successful. "url" and "where" properties are mandatory - others are optional. 
 
-### \_ucUtils.restart(clearCache)
-
-Immediately restart the browser. If the boolean `clearCache` is `true` then Firefox will invalidate startupCache which allows changes to the enabled scripts to take effect.
-
-### \_ucUtils.startupFinished() -> Promise
-
-```js
-_ucUtils.startupFinished()
-.then(()=>{
-  console.log("startup done");
-});
-```
-
-Returns a promise that will be resolved when all windows have been restored during session startup. If all windows have already been restored at the time of calling the promise will be resolved immediately.
-
-### \_ucUtils.windowIsReady() -> Promise
-
-> Deprecated since 0.9.0 - use [windows.waitWindowLoading()](#_ucutilswindowswaitwindowloadingwindow---promisewindow) 
-
-```js
-_ucUtils.windowIsReady(window)
-.then(()=>{
-  console.log("this window has finished starting up");
-});
-```
-
- This corresponds to `browser-delayed-startup-finished` event. Note that extension-engine initialization code may or may not have run when this promise resolves. 
-
-### Difference of startupFinished and windowIsReady
-
-Since scripts run per window, `startupFinished` will be resolved once in *each window that called it* when ALL those windows have been restored. But `windowIsReady` will be resolved whenever the particular window that calls it has started up.
-
-### \_ucUtils.showNotification(details) -> Promise
-
-```js
-_ucUtils.showNotification(
-  {
-    label : "Message content",  // text shown in the notification
-    type : "something",         // opt identifier for this notification
-    priority: "info",           // opt one of ["system","critical","warning","info"]
-    window: window.top ,        // opt reference to a chromeWindow
-    tab: gBrowser.selectedTab,  // opt reference to a tab
-    buttons: [...],             // opt array of button descriptors
-    callback: () => {}          // opt function to be called when notification is dismissed
-  }
-)
-```
-Priority defines the ordering and coloring of this notification. Notifications of higher priority are shown before those of lower priority. Priority defaults to "info".
-
-If `window` key exists then the notification will be shown in that window. Otherwise it is shown in the last active window.
-
-If `tab` key exists then the notification will be shown in that tab only. Otherwise the notification is global to the window.
-
-See more about `buttons` and `callback` keys at [notificationbox.js](https://searchfox.org/mozilla-central/rev/3f782c2587124923a37c750b88c5a40108077057/toolkit/content/widgets/notificationbox.js#113)
-
-### \_ucUtils.updateStyleSheet(name, sheet_mode) -> boolean
-
-```js
-_ucUtils.updateStyleSheet() // reloads userChrome.css
-
- // reloads a style in author-mode stylesheets list with matching name
-_ucUtils.updateStyleSheet("userChrome.au.css","author")
-
- // reloads a style in agent-mode stylesheets list with matching name
-_ucUtils.updateStyleSheet("userChrome.ag.css","agent")
-```
-
-Argument `filename` is relative to `resources` folder, but you can use `../` prefix to get back to `chrome` folder.
-
-Note, you can't reload a style that is in one sheet-mode list into another sheet-mode. Such as, you cannot use this to reload userChrome.css into agent-mode list.
-
-Return value true/false indicates wheter a style file with specified name was found in the corresponding list.
-
-If the specified stylesheet imports other files, then calling this will also reload any of those imported files. However, in experience it might be that reload of imported stylesheets does not take effect until a new window is created.
-
-## Prefs
-
-A shortcut for reading and writing preferences
-
-### \_ucUtils.prefs.set(prefName,value) -> undefined
-
-```js
-_ucUtils.prefs.set("some.pref.path","test");
-_ucUtils.prefs.set("some.other.pref",300);
-```
-
-This will `throw` if you try to set a pref to a value of different type than what it currently is (ie. boolean vs. string) unless the pref doesn't exist when this is called.
-This will also throw if you try to set the pref with value that is not one of `number, string, boolean` - number is also converted to integer.
-
-### \_ucUtils.prefs.get(prefName) -> Pref
-
-Returns a representation of the pref wrapped into an object with properties:
-
-```js
-let myPref = _ucUtils.prefs.get("userChrome.scripts.disabled");
-/*
-* {
-*   exists() // true|false indicating if this pref exists
-*   name     // string - the called pref name
-*   value    // <number|string|boolean> | `null` - null means pref with this name could not be read
-* set value() // same as _ucUtils.prefs.set(name,value)
-*   hasUserValue() // true|false indicating if this has user set value
-*   type     // "string"|"boolean"|"number"|"invalid"
-*   reset()  // resets this pref to its default value
-* }
-*/
-
-myPref.exists()
-// false - "userChrome.scripts.disabled" does not exist
-```
-
-
-### \_ucUtils.prefs.addListener(prefName,callback) -> Object
-
-```js
-let callback = (value,pref) => (console.log(`${pref} changed to ${value}`))
-let prefListener = _ucUtils.prefs.addListener("userChromeJS",callback);
-```
-
-Note that the callback will be invoked when any pref that starts with `userChromeJS` is changed. The pref in callback argument will be a `Pref` object wrapping the value of the actual pref whose value was changed.
-
-### \_ucUtils.prefs.removeListener(listener)
-
-```
-_ucUtils.prefs.removeListener(prefListener) // from above example
-```
-
-Pref class can also be imported directly to module scripts like this:
-
-```js
-import { Pref } from "chrome://userchromejs/content/utils.sys.mjs";
-```
-
-## Filesystem general
-
-Scripts should generally use the `resources` folder for their files. The helper functions interacting with filesystem expect `resources` to be the root folder for script operations.
-
-The resources folder is registered to chrome:// scheme so scripts and stylesheets can use the following URL to access files within it:
-
-```
-"chrome://userChrome/content/<filename>.txt" 
-```
-
-Scripts folder is registered to: `chrome://userScripts/content/`
-
-The loader module folder is registered to `chrome://userchromejs/content/`
-
-### \_ucUtils.openScriptDir() -> Boolean
-
-```js
-_ucUtils.openScriptDir();
-```
-
-Tries to open your script directory in OS file manager. Returns true or false indicating success. Whether this works or not probably depends on your OS. Only tested on Windows 10.
-
-## Filesystem \_ucUtils.fs
-
-These APIs exist starting from versioned release "0.7".
-
-Main idea is that various methods return a `FileSystemResult` object instead of the actual operation result directly.
-
-The `FileSystemResult` result object is one of four types:
-* `Filesystem.RESULT_FILE` get reference to a file
-* `Filesystem.RESULT_DIRECTORY` get referece to a directory
-* `Filesystem.RESULT_ERROR` non-existent file or other kind of error
-* `Filesystem.RESULT_CONTENT` file read operation results
-
-The result object has various methods to access underlying data.
-
-```js
-// return nsIFile object representing either a file a directory
-// throws if called on CONTENT or ERROR types
-fsResult.entry()
-
-// return the file text content as string
-// throws if called on anything except CONTENT type
-fsResult.content() // returns content that was read 
-
-// return an iterator over files in a directory
-// Note, the individual entries are nsIFile objects, not wrapped `FileSystemResult`s
-// throws when called on anything except DIRECTORY type
-fsResult.entries()
-// entries() is called internally if you try to iterate over the result:
-fsResult = _ucUtils.getEntry("my_dir");
-for(let file of fsResult){
-  ...
-}
-
-// size of read content or size of the file on disk
-fsResult.size
-
-// Read the content of this FileSystemResult
-// throws if called on non-FILE type
-let content = await fsResult.read() // Async read
-console.log(content);
-<< "Hello world!"
-
-// throws if called on non-FILE type
-let sync_content = fsResult.readSync();
-console.log(content);
-<< "Hello world!"
-
-// get a file URI for this result
-console.log(fsResult.fileURI)
-<< file:///c:/temp/things/some.txt
-
-// Tries to open a given file entry path in OS file manager.
-// Returns true or false indicating success.
-// Whether this works or not probably depends on your OS.
-// Only tested on Windows 10.
-fsResult.showInFileManager()
-
-```
-
-### \_ucUtils.fs.getEntry(fileName) -> FileSystemResult
-
-```js
-let fsResult = _ucUtils.fs.getEntry("some.txt");
-result.isFile()
-// true
-
-let nonexistent = _ucUtils.fs.getEntry("nonexistent.txt");
-nonexistent.isError()
-// true
-
-let dir = _ucUtils.fs.getEntry("directory");
-dir.isDirectory()
-// true
-```
-
-### \_ucUtils.fs.readFile(fileName) -> Promise\<FileSystemResult\>
-
-Asynchronously read a file. Throws if the argument is not a string
-
-```js
-let fsResult = await _ucUtils.fs.readFile("some.txt");
-fsResult.isFile()
-// false
-fsResult.isContent()
-// true
-console.log(fsResult.content())
-// "Hello world!"
-```
-
-### \_ucUtils.fs.readFileSync(some) -> FileSystemResult
-
-Synchronously read a file. The argument can be either a string representing filename or referece to a nsIFile object.
-
-```js
-let fsResult = _ucUtils.fs.readFileSync("some.txt");
-fsResult.isContent()
-// true
-console.log(fsResult.content())
-// "Hello world!"
-```
-
-### \_ucUtils.fs.readJSON(fileName) -> Promise\<Object | null\>
-
-Asynchronously try to read a file and parse it as json. If file can't be parsed then returns `null`.
-
-```js
-let fsResult = await _ucUtils.fs.readJSON("some.json")
-```
-
-### \_ucUtils.fs.writeFile(fileName, content, options) -> Promise\<Number\>
-
-```js
-let some_content = "Hello world!\n";
-let bytes = await _ucUtils.fs.writeFile( "hello.txt", some_content );
-console.log(bytes);
-
-<< 13
-```
-
-Write the content into file **as UTF8**. On successful write the promise is resolved with number of written bytes.
-
-By default writing files using this API is only allowed in **resources** directory. Calling `writeFile` with fileName like "../test.txt" will then reject the promise. You must set pref `userChromeJS.allowUnsafeWrites` to `true` to allow writing outside of resources.
-
-**Note!** Currently this method **replaces** the existing file if one exists.
-
-The optional `options` argument is currently only used to pass a filename for temp file. By default it is derived from fileName. 
-
-### \_ucUtils.fs.chromeDir() -> FileSystemResult
-
-Returns `FileSystemResult` with type DIRECTORY for the profile `chrome` directory
-
-```js
-let fsResult = _ucUtils.fs.chromeDir();
-let uri = _ucUtils.chromeDir.fileURI // a file:/// uri
-
-for (let file of fsResult){ // equal to fsResult.entries()
-  console.log(file.leafName);
-}
-```
-
-## Shared global object
-
+## SharedStorage
 If scripts need to store information to a global object they can get reference to that as follows:
 
 ```js
-let global = _ucUtils.sharedGlobal
+let global = UC_API.SharedStorage
 ```
 
-The information in the global object is available for all scripts
+Note that data stored here is only available in memory and does not persist on disk.
+
+## Windows
+
+Namespace to interact with windows.
+
+### Windows.getAll(onlyBrowsers) -> `Array`
+
+Return a list of handles for each window object for this firefox instance. If `onlyBrowsers` is `true` then this only includes browser windows. If it's `false` then it also includes consoles, PiP, non-native notifications etc.
+
+```js
+let allMyWindows = UC_API.Windows.getAll(false)
+```
+
+`onlyBrowsers` defaults to `true`.
+
+### UC_API.Windows.forEach(function,onlyBrowsers)
+
+```js
+UC_API.Windows.forEach((document,window) => console.log(document.location), false)
+```
+
+Runs the specified function for each window. The function will be given two arguments - reference to the document of the window and reference to the window object itself.
+
+**Note!** `UC_API` may not be available on all target window objects if onlyBrowsers is `false`. The callback function should check for it's availability when called that way.
+
+### Windows.getLastFocused(?windowType) -> `Window`
+
+Returns the last focused window. If windowType is undefined then returns `"navigator:browser"` window (eg. main browser window) on Firefox or `"mail:3pane"` window on Thunderbird.
+
+### Windows.isBrowserWindow(window) -> `Boolean`
+
+Returns `true`/`false` indicating if the argument window is a main browser window.
+
+### Windows.onCreated(callback)
+
+Registers the `callback` function to be called when a new window has been opened. The callback is executed on `DOMContentLoaded` event. Perhaps not useful for normal scripts, but can be an easy way for a background-script to do work when window is created.
+
+**Note!** This also works as replacement in version `0.10.0` for now deprecated `@startup` directive.
+
+```js
+// ==UserScript==
+// @name           initialization script
+// @description    my filename is background.uc.mjs
+// @onlyonce
+// ==/UserScript==
+
+import { Windows, Hotkeys } from "chrome://userchromejs/content/uc_api.sys.mjs";
+
+let counter = 0;
+
+Hotkeys.define({
+  id: "myHotkey",
+  modifiers: "ctrl shift",
+  key: "F",
+  command: () => console.log("Windows opened until now:", counter)
+}).autoAttach(); // autoAttach causes this hotkey to be added to all new windows
+
+Windows.onCreated(win => {
+  counter++
+});
+
+``` 
+Since the above script is marked as `@onlyonce` it is only injected into the first browser window to do initialization work (registering the hotkey). But the `Windows.onCreated` callback gets called whenever a new window is created so the counter get updated.
+
+### Windows.waitWindowLoading(window) -> Promise<Window>
+
+Returns a `Promise` which resolves when it has finished its initialization work. Scripts are normally injected on `DOMContentLoaded` event, but lots of initialization has not happened yet.
+
+```js
+UC_API.Windows.waitWindowLoading(window)
+.then(win => {
+  console.log(win.document.title + " has finished loading")
+})
+```
+
+[UC_API.Windows](#Windows)
 
 # Startup Error
 
@@ -1050,7 +1070,7 @@ One notable example is if you try to access `gURLBar` - that will internally end
 
 Think about when your script needs to run and you have some options:
 
-* Wait until windows have been restored before running functions that access gBrowser. One method for that would be: `_ucUtils.startupFinished().then(myFunctionAccessinggBrowser)`
+* Wait until windows have been restored before running functions that access gBrowser. One method for that would be: `UC_API`.Runtime.startupFinished().then(myFunctionAccessinggBrowser)`
 
 * Check in your function whether `gBrowser` is available, and if not use `_gBrowser` instead.
 
