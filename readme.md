@@ -531,7 +531,7 @@ dir.isDirectory()
 // true
 ```
 
-### FileSystem.readFile(fileName) -> `Promise\<FileSystemResult\>`
+### FileSystem.readFile(fileName) -> `Promise<FileSystemResult>`
 
 Asynchronously read a file. Throws if the argument is not a string
 
@@ -557,7 +557,7 @@ console.log(fsResult.content())
 // "Hello world!"
 ```
 
-### FileSystem.readJSON(fileName) -> `Promise\<Object | null\>`
+### FileSystem.readJSON(fileName) -> `Promise<Object | null>`
 
 Asynchronously try to read a file and parse it as json. If file can't be parsed then returns `null`.
 
@@ -565,7 +565,7 @@ Asynchronously try to read a file and parse it as json. If file can't be parsed 
 let fsResult = await UC_API.FileSystem.readJSON("some.json")
 ```
 
-### FileSystem.writeFile(fileName, content, options) -> `Promise\<Number\>`
+### FileSystem.writeFile(fileName, content, options) -> `Promise<Number>`
 
 ```js
 let some_content = "Hello world!\n";
@@ -735,7 +735,8 @@ import { Pref } from "chrome://userchromejs/content/utils.sys.mjs";
 
 Provides general information about the loader and state of the browser.
 
-### Runtime.appVariant -> `String ["Firefox" | "Thunderbird"]`
+### Runtime.appVariant -> `String`
+One of "Firefox" or "Thunderbird"
 
 ### Runtime.brandName -> `String`
 Brand name of the browser eg. "Firefox", "Firefox Nightly" etc.
@@ -750,7 +751,7 @@ The version string of `boot.sys.mjs`
 
 Immediately restart the browser. If the boolean `clearCache` is `true` then Firefox will invalidate startupCache which allows changes to the enabled scripts to take effect. A closing prompt is shown if some other part of the browser such as a website would need a confirmation about restart.
 
-### Runtime.startupFinished() -> `Promise\<>`
+### Runtime.startupFinished() -> `Promise<>`
 
 ```js
 UC_API.Runtime.startupFinished()
@@ -764,7 +765,7 @@ Returns a promise that will be resolved when all windows have been restored duri
 ## Scripts
 Provide information about registered scripts and styles and some controls for them.
 
-### Scripts.getScriptData(aFilter) -> `Array\<ScriptInfo>` | `ScriptInfo`
+### Scripts.getScriptData(aFilter) -> `Array<ScriptInfo>` | `ScriptInfo`
 
 Returns `ScriptInfo` object(s) with a **copy** of their metadata. This includes scripts that are not yet running or which are disabled by pref.
 
@@ -794,7 +795,7 @@ console.log(`You have ${scripts.length} running scripts);
 
 **Note!** If the first argument is anything other than a function or a string, then `getScriptData()` will throw an error.
 
-### Scripts.getStyleData(aFilter) -> `Array\<ScriptInfo>` | `ScriptInfo`
+### Scripts.getStyleData(aFilter) -> `Array<ScriptInfo>` | `ScriptInfo`
 
 Mechanically exactly the same as `getScriptData()` but returns styles instead of scripts.
 
