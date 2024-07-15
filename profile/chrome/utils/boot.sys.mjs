@@ -1,7 +1,7 @@
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 import { loaderModuleLink, Pref, FileSystem, windowUtils, showNotification, startupFinished, restartApplication, escapeXUL } from "chrome://userchromejs/content/utils.sys.mjs";
 
-const FX_AUTOCONFIG_VERSION = "0.10.0";
+const FX_AUTOCONFIG_VERSION = "0.10.1";
 console.warn( "Browser is executing custom scripts via autoconfig" );
 
 const APP_VARIANT = (() => {
@@ -343,6 +343,7 @@ class UserChrome_js{
     this.scripts = [];
     this.styles = [];
     this.SESSION_RESTORED = false;
+    this.IS_ENABLED = Services.prefs.getBoolPref(PREF_ENABLED,false);
     this.isInitialWindow = true;
     this.initialized = false;
     this.init();
@@ -367,6 +368,12 @@ class UserChrome_js{
       return
     }
     loaderModuleLink.setup(this,FX_AUTOCONFIG_VERSION,AppConstants.MOZ_APP_DISPLAYNAME_DO_NOT_USE,APP_VARIANT,ScriptData);
+    
+    if(!this.IS_ENABLED){
+      Services.obs.addObserver(this, 'domwindowopened', false);
+      this.initialized = true;
+      return
+    }
     // gBrowserHack setup
     this.GBROWSERHACK_ENABLED = 
       (Services.prefs.getBoolPref("userChromeJS.gBrowser_hack.required",false) ? 2 : 0)
@@ -433,7 +440,7 @@ class UserChrome_js{
     const window = document.defaultView;
     if(!(/^chrome:(?!\/\/global\/content\/(commonDialog|alerts\/alert)\.xhtml)|about:(?!blank)/i).test(window.location.href)){
       // Don't inject scripts to modal prompt windows or notifications
-      if(this.styles.length > 0){
+      if(this.IS_ENABLED && this.styles.length > 0){
         const disabledScripts = getDisabledScripts();
         for(let style of this.styles){
           if(!disabledScripts.includes(style.filename)){
@@ -446,28 +453,27 @@ class UserChrome_js{
     ChromeUtils.defineLazyGetter(window,"UC_API",() =>
       ChromeUtils.importESModule("chrome://userchromejs/content/uc_api.sys.mjs")
     )
-    document.allowUnsafeHTML = false; // https://bugzilla.mozilla.org/show_bug.cgi?id=1432966
-    
-    // This is a hack to make gBrowser available for scripts.
-    // Without it, scripts would need to check if gBrowser exists and deal
-    // with it somehow. See bug 1443849
-    const _gb = APP_VARIANT.FIREFOX && "_gBrowser" in window;
-    if(this.GBROWSERHACK_ENABLED && _gb){
-      window.gBrowser = window._gBrowser;
-    }else if(_gb && this.isInitialWindow){
-      this.isInitialWindow = false;
-      let timeout = window.setTimeout(() => {
-        maybeShowBrokenNotification(window);
-      },5000);
-      windowUtils.waitWindowLoading(window)
-      .then(() => {
-        // startup is fine, clear timeout
-        window.clearTimeout(timeout);
-      })
-    }
-    
-    // Inject scripts to window
-    if(Services.prefs.getBoolPref(PREF_ENABLED,false)){
+    if(this.IS_ENABLED){
+      document.allowUnsafeHTML = false; // https://bugzilla.mozilla.org/show_bug.cgi?id=1432966
+      
+      // This is a hack to make gBrowser available for scripts.
+      // Without it, scripts would need to check if gBrowser exists and deal
+      // with it somehow. See bug 1443849
+      const _gb = APP_VARIANT.FIREFOX && "_gBrowser" in window;
+      if(this.GBROWSERHACK_ENABLED && _gb){
+        window.gBrowser = window._gBrowser;
+      }else if(_gb && this.isInitialWindow){
+        this.isInitialWindow = false;
+        let timeout = window.setTimeout(() => {
+          maybeShowBrokenNotification(window);
+        },5000);
+        windowUtils.waitWindowLoading(window)
+        .then(() => {
+          // startup is fine, clear timeout
+          window.clearTimeout(timeout);
+        })
+      }
+      // Inject scripts to window
       const disabledScripts = getDisabledScripts();
       for(let script of this.scripts){
         if(script.inbackground || script.injectionFailed){
@@ -531,6 +537,9 @@ class UserChrome_js{
       for(let style of this.styles){
         UserChrome_js.appendScriptMenuitemToFragment(window,itemsFragment,style);
       }
+    }
+    if(!this.IS_ENABLED){
+      itemsFragment.append(window.MozXULElement.parseXULToFragment('<menuitem label="&lt;fx-autoconfig is disabled&gt;" disabled="true"></menuitem>'));
     }
     menuFragment.getElementById("menuUserScriptsPopup").prepend(itemsFragment);
     popup.prepend(menuFragment);
