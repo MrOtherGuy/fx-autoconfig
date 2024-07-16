@@ -28,6 +28,8 @@ Copy the *contents* of the directory called "program" (not the directory itself)
 
 This means that if you want to affect multiple installations, like release, beta, ESR etc. you need to add the files to all of them.
 
+**! Note for non-regular Firefox installs:** Compatibility issues will arise if your Firefox install is already using autoconfiguration files (such as Librefox). In these  situations the easiest route might be to merge the *contents* of `config.js` with the autoconfiguration file your install has. This may or may not require you to also set prefs from `<program>/defaults/pref/config-prefs.js` with the excetion of `general.config.filename`.
+
 <details>
 <summary>Windows</summary>
 
