@@ -1,0 +1,16 @@
+{
+	"name": "@types/fx-autoconfig",
+	"version": "1.0.0",
+	"description": "TypeScript definitions for fx-autoconfig API.",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/MrOtherGuy/fx-autoconfig.git"
+	},
+	"license": "MPL-2.0",
+	"types": "./index.d.ts",
+	"bugs": {
+		"url": "https://github.com/MrOtherGuy/fx-autoconfig/issues"
+	},
+	"homepage": "https://github.com/MrOtherGuy/fx-autoconfig",
+	"private": true
+}
