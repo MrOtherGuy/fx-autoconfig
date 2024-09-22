@@ -423,6 +423,8 @@ Note that some CSS features may not be available for file:// uri styles. However
 
 For pre 0.10.0 definitions you can check separate file available at [uc_utils_old.md](./uc_utils_old.md).
 
+TypeScript types available as a private npm package in the [types](./types) directory.
+
 Helpers are available as a namespace object - the whole namespace can be imported to module scripts as follows:
 
 ```js
