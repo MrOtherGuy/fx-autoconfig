@@ -1,7 +1,7 @@
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 import { loaderModuleLink, Pref, FileSystem, windowUtils, showNotification, startupFinished, restartApplication, escapeXUL } from "chrome://userchromejs/content/utils.sys.mjs";
 
-const FX_AUTOCONFIG_VERSION = "0.10.1";
+const FX_AUTOCONFIG_VERSION = "0.10.2";
 console.warn( "Browser is executing custom scripts via autoconfig" );
 
 const APP_VARIANT = (() => {
