@@ -14,9 +14,13 @@ export class Hotkey{
   constructor(hotkeyDetails,commandDetails){
     this.command = commandDetails;
     this.trigger = hotkeyDetails;
-    this.#matchingSelector = `key[modifiers="${hotkeyDetails.modifiers}"][${hotkeyDetails.key?'key="'+hotkeyDetails.key:'keycode="'+hotkeyDetails.keycode}"]`;
+    this.#matchingSelector = null;
   }
   get matchingSelector(){
+    if(!this.#matchingSelector){
+      let trigger = this.trigger;
+      this.#matchingSelector = `key[modifiers="${trigger.modifiers}"][${trigger.key?'key="'+trigger.key:'keycode="'+trigger.keycode}"]`
+    }
     return this.#matchingSelector
   }
   autoAttach(opt){
@@ -42,13 +46,13 @@ export class Hotkey{
     }
   }
   suppressOriginalKey(window){
-    let oldKey = window.document.querySelector(this.#matchingSelector);
+    let oldKey = window.document.querySelector(this.matchingSelector);
     if(oldKey){
       oldKey.setAttribute("disabled","true")
     }
   }
   restoreOriginalKey(window){
-    let oldKey = window.document.querySelector(this.#matchingSelector);
+    let oldKey = window.document.querySelector(this.matchingSelector);
     oldKey.removeAttribute("disabled");
   }
   static #createKey(doc,details){
@@ -72,10 +76,10 @@ export class Hotkey{
       console.warn("Fx-autoconfig: command with id '"+details.id+"' already exists");
       return
     }
-    let command = createElement(doc,"command",{id: details.id,oncommand: "this._oncommand(event);"});
+    let command = createElement(doc,"command",{id: details.id});
     commandSet.insertBefore(command,commandSet.firstChild||null);
     const fun = details.command;
-    command._oncommand = (e) => fun(e.view,e);
+    command.addEventListener("command",ev => fun(ev.view,ev))
     return
   }
   static ERR_KEY = 0;
@@ -604,8 +608,12 @@ export function createWidget(desc){
       for (let p in props){
         toolbaritem.setAttribute(p, props[p]);
       }
+      
       if(typeof callback === "function"){
-        toolbaritem.setAttribute("onclick",`${desc.allEvents?"":"event.button===0 && "}UC_API.SharedStorage.widgetCallbacks.get(this.id)(event,window)`);
+        const allEvents = !!desc.allEvents;
+        toolbaritem.addEventListener("click",(ev) => {
+          allEvents || ev.button === 0 && SharedGlobal.widgetCallbacks.get(ev.target.id)(ev,ev.target.ownerGlobal)
+        })
       }
       for (let attr in desc){
         if(attr != "callback" && !(attr in props)){
@@ -774,15 +782,13 @@ export function startupFinished(){
   return new Promise(resolve => lazy.startupPromises.add(resolve))
 }
 
-export function toggleScript(el){
-  let isElement = !!el.tagName;
-  if(!isElement && typeof el != "string"){
-    return
+export function toggleScript(aFilename){
+  if(typeof aFilename != "string"){
+    throw new Error("expected name of the script as string")
   }
-  const name = isElement ? el.getAttribute("filename") : el;
-  let script = name.endsWith("js")
-    ? getScriptData(name)
-    : getStyleData(name);
+  let script = aFilename.endsWith("js")
+    ? getScriptData(aFilename)
+    : getStyleData(aFilename);
   if(!script){
     return null
   }
