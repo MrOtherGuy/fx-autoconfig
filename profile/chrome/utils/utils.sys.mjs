@@ -23,8 +23,9 @@ export class Hotkey{
     }
     return this.#matchingSelector
   }
-  autoAttach(opt){
+  async autoAttach(opt){
     const suppress = opt?.suppressOriginal || false;
+    await startupFinished();
     for (let window of windowUtils.getAll()){
       if(window.document.getElementById(this.trigger.id)){
         continue
@@ -85,14 +86,16 @@ export class Hotkey{
   static ERR_KEY = 0;
   static NORMAL_KEY = 1;
   static FUN_KEY = 2;
+  static VK_KEY = 4;
   
   static #getKeyCategory(key){
     return (/^[\w-]$/).test(key)
           ? Hotkey.NORMAL_KEY
-          : (/^F(?:1[0,2]|[1-9])$/)
-            .test(key)
-            ? Hotkey.FUN_KEY
-            : Hotkey.ERR_KEY
+          : (/^VK_[A-Z]+/).test(key)
+            ? Hotkey.VK_KEY
+            : (/^F(?:1[0,1,2]|[1-9])$/).test(key)
+              ? Hotkey.FUN_KEY
+              : Hotkey.ERR_KEY
   }
   
   static define(desc){
@@ -100,19 +103,21 @@ export class Hotkey{
     if(keyCategory === Hotkey.ERR_KEY){
       throw new Error("Provided key '"+desc.key+"' is invalid")
     }
-    if(keyCategory === Hotkey.FUN_KEY){
-      throw new Error("Registering a hotkey with no modifiers is not supported, except for function keys F1-F12")
-    }
     let commandType = typeof desc.command;
     if(!(commandType === "string" || commandType === "function")){
-      throw new TypeError("command must be either a string or function")
+      throw new Error("command must be either a string or function")
     }
-    
+    if(commandType === "function" && !desc.id){
+      throw new Error("command id must be specified when callback is a function")
+    }
     const validMods = ["accel","alt","ctrl","meta","shift"];
-    const mods = desc.modifiers.toLowerCase().split(" ").filter(a => validMods.includes(a));
+    const mods = desc.modifiers?.toLowerCase().split(" ").filter(a => validMods.includes(a));
+    if(keyCategory === Hotkey.NORMAL_KEY && !(mods && mods.length > 0)){
+      throw new Error("Registering a hotkey with no modifiers is not supported, except for function keys F1-F12")
+    }
     let keyDetails = {
       id: desc.id,
-      modifiers: mods.join(",").replace("ctrl","accel"),
+      modifiers: mods?.join(",").replace("ctrl","accel") ?? "",
       command: commandType === "string"
                 ? desc.command
                 : `cmd_${desc.id}`
@@ -123,7 +128,7 @@ export class Hotkey{
     if(keyCategory === Hotkey.NORMAL_KEY){
       keyDetails.key = desc.key.toUpperCase();
     }else{
-      keyDetails.keycode = `VK_${desc.key}`;
+      keyDetails.keycode = keyCategory === Hotkey.FUN_KEY ? `VK_${desc.key}` : desc.key;
     }
     return new Hotkey(
       keyDetails,
