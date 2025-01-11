@@ -1,7 +1,7 @@
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 import { loaderModuleLink, Pref, FileSystem, windowUtils, showNotification, startupFinished, restartApplication, escapeXUL, toggleScript } from "chrome://userchromejs/content/utils.sys.mjs";
 
-const FX_AUTOCONFIG_VERSION = "0.10.2";
+const FX_AUTOCONFIG_VERSION = "0.10.3";
 console.warn( "Browser is executing custom scripts via autoconfig" );
 
 const APP_VARIANT = (() => {
@@ -306,15 +306,7 @@ function maybeShowBrokenNotification(window){
       label: "fx-autoconfig: Startup might be broken",
       image: "chrome://browser/skin/notification-icons/popup.svg",
       priority: "critical"
-    },
-    [{
-      label: "Enable workaround",
-      callback: (notification) => {
-        Services.prefs.setBoolPref("userChromeJS.gBrowser_hack.required",true);
-        restartApplication(false);
-        return false
-      }
-    }]
+    }
   );
 }
 
