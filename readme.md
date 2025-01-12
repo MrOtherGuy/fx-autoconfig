@@ -847,21 +847,13 @@ console.log(styleInfo.name, styleInfo.chromeURI);
 
 **Note!** There needs to be a new-line after the closing `// ==/UserScript==` "tag" for the metadata to be parsed correctly.
 
-### Scripts.toggleScript(fileName or element) -> Object | null
-
-filename:
+### Scripts.toggleScript(fileName) -> Object | null
 
 ```js
 UC_API.Scripts.toggleScript("test.uc.js")
 ```
 
-Element where `this` is a menuitem:
-
-```js
-UC_API.Scripts.toggleScript(this);
-```
-
-If the argument is an element the function reads a `filename` attribute from the element and uses that. Toggles the specified script, note that browser restart is required for changes to take effect.
+Toggles the specified script, note that browser restart is required for changes to take effect.
 
 The return value is `null` if a matching script was not found. Otherwise, the return value is an object `{ script: filename, enabled: true|false }`
 
