@@ -1,7 +1,7 @@
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 import { loaderModuleLink, Pref, FileSystem, windowUtils, showNotification, startupFinished, restartApplication, escapeXUL, toggleScript } from "chrome://userchromejs/content/utils.sys.mjs";
 
-const FX_AUTOCONFIG_VERSION = "0.10.3";
+const FX_AUTOCONFIG_VERSION = "0.10.4";
 console.warn( "Browser is executing custom scripts via autoconfig" );
 
 const APP_VARIANT = (() => {
@@ -407,7 +407,7 @@ class UserChrome_js{
           this.registerScript(style,!disabledScripts.includes(style.filename));
         }
       }
-      this.addAgentStyles(this.styles.filter(style => style.styleSheetMode === "agent"));
+      this.addAgentStyles(this.styles.filter(style => style.styleSheetMode === "agent" && !disabledScripts.includes(style.filename)));
     }
     this.scripts.sort((a,b) => a.loadOrder - b.loadOrder);
     this.styles.sort((a,b) => a.loadOrder - b.loadOrder);
