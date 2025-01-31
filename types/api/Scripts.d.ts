@@ -1,8 +1,7 @@
+type StyleSheetMode = "agent" | "author";
+
 interface ScriptInfo {
-	/**
-	 * @returns nsIFile
-	 */
-	asFile(): any;
+	asFile(): nsIFile;
 	author: string | undefined;
 	charset: string | undefined;
 	chromeURI: string | undefined;
@@ -27,7 +26,7 @@ interface ScriptInfo {
 	optionsURL: string | undefined;
 	referenceURI: string;
 	regex: RegExp | null;
-	styleSheetMode: any | null;
+	styleSheetMode: StyleSheetMode | null;
 	type: string;
 	updateURL: string | undefined;
 	useFileURI: boolean;
@@ -111,5 +110,5 @@ interface Scripts {
 	 * might be that reload of imported stylesheets does not take effect until a
 	 * new window is created.
 	 */
-	reloadStyleSheet(name?: string, sheet_mode?: "agent" | "author"): boolean;
+	reloadStyleSheet(name?: string, sheet_mode?: StyleSheetMode): boolean;
 }

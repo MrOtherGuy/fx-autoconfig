@@ -67,7 +67,7 @@ interface Utils {
 	createElement(
 		document: Document,
 		tagname: string,
-		attributes: any,
+		attributes: Record<string, string>,
 		isHTML: boolean,
 	): Element;
 
@@ -83,7 +83,7 @@ interface Utils {
 	 * in multiple Firefox windows then the first one should
 	 * succeed, but successive calls should throw an Error.
 	 *
-	 * @returns this class https://searchfox.org/mozilla-central/source/browser/components/customizableui/CustomizableUI.sys.mjs#5491
+	 * @returns this class https://searchfox.org/mozilla-central/source/browser/components/customizableui/CustomizableUI.sys.mjs#5991 (or `WidgetGroupWrapper` if outdated).
 	 */
 	createWidget(details: WidgetDetails): WidgetWrapper;
 

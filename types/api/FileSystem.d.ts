@@ -72,17 +72,13 @@ interface UC_FileSystem {
 	chromeDir(): FileSystemResult;
 	getEntry(fileName: string): FileSystemResult;
 	readFile(fileName: string): Promise<FileSystemResult>;
-
-	/**
-	 * @param some any = nsIFile
-	 */
-	readFileSync(some: string | any): FileSystemResult;
+	readFileSync(some: string | nsIFile): FileSystemResult;
 
 	/**
 	 * Asynchronously try to read a file and parse it as json.
 	 * If file can't be parsed then returns `null`.
 	 */
-	readJSON(fileName: string): Promise<any | null>;
+	readJSON(fileName: string): Promise<object | null>;
 
 	/**
 	 * Write the content into file *as UTF8*.
@@ -96,7 +92,7 @@ interface UC_FileSystem {
 	 * @param content
 	 * @param options currently only used to pass a filename for temp file.
 	 * By default it is derived from fileName.
-	 * @returns the promise that resolves with number of written bytes.
+	 * @returns the number of written bytes.
 	 *
 	 * @note Currently this method replaces the existing file if one exists.
 	 */
