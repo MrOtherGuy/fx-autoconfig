@@ -11,7 +11,7 @@ interface Pref {
 
 interface PrefListener {
 	// copied from lib.gecko.xpcom.d.ts
-	observer(aDomain: string, aObserver: any, aHoldWeak?: boolean): void;
+	observer(aDomain: string, aObserver: nsIObserver, aHoldWeak?: boolean): void;
 	pref: string;
 }
 

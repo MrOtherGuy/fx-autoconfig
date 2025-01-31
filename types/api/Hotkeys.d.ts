@@ -4,7 +4,7 @@ interface HotkeyDetails {
 	key: string;
 
 	/**
-	 * If command is a function then a new <command> element will be created
+	 * If command is a function then a new `<command>` element will be created
 	 * for it with an id attribute derived from the specified id.
 	 *
 	 * If command is a string then the hotkey will simply invoke a command
@@ -14,12 +14,16 @@ interface HotkeyDetails {
 	command: ((window: Window, commandEvent: any) => void) | string;
 }
 
+interface HotkeyOptions {
+	suppressOriginal: boolean;
+}
+
 interface Hotkey {
 	command: any;
 	matchingSelector: string;
 	trigger: any;
-	attachToWindow(window: Window, opt): Promise<void>;
-	autoAttach(opt?): void;
+	attachToWindow(window: Window, opts?: HotkeyOptions): Promise<void>;
+	autoAttach(opts?: HotkeyOptions): Promise<void>;
 	restoreOriginalKey(window: Window): void;
 	suppressOriginalKey(window: Window): void;
 }

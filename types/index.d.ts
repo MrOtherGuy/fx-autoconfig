@@ -20,4 +20,15 @@ declare global {
 	};
 }
 
+declare module "chrome://userchromejs/content/uc_api.sys.mjs" {
+	export const FileSystem: UC_FileSystem;
+	export const Hotkeys: Hotkeys;
+	export const Notifications: Notifications;
+	export const Prefs: Prefs;
+	export const Runtime: Runtime;
+	export const Scripts: Scripts;
+	export const Utils: Utils;
+	export const Windows: Windows;
+}
+
 export type {};
