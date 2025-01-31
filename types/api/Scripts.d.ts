@@ -91,11 +91,10 @@ interface Scripts {
 	): ScriptInfo;
 
 	/**
-	 * @param fileName If element, reads a `filename` attribute from the element
-	 * and uses that. Toggles the specified script, note that browser restart is
-	 * required for changes to take effect.
+	 * Toggles the specified script, note that browser restart is required for
+	 * changes to take effect.
 	 */
-	toggleScript(fileName: string | Element): ScriptInfo;
+	toggleScript(fileName: string): ScriptInfo;
 
 	/**
 	 * @param name Relative to resources folder, but you can use `../` prefix

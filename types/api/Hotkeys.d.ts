@@ -19,7 +19,7 @@ interface Hotkey {
 	matchingSelector: string;
 	trigger: any;
 	attachToWindow(window: Window, opt): Promise<void>;
-	autoAttach(opt?): void;
+	autoAttach(opt?): Promise<void>;
 	restoreOriginalKey(window: Window): void;
 	suppressOriginalKey(window: Window): void;
 }
