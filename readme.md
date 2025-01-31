@@ -423,7 +423,18 @@ Note that some CSS features may not be available for file:// uri styles. However
 
 For pre 0.10.0 definitions you can check separate file available at [uc_utils_old.md](./uc_utils_old.md).
 
-TypeScript types are also available as a private npm package in the [types](./types) directory.
+TypeScript types are also available as a private npm package in the [types](./types) directory. To use them with `chrome://` imports - put the following in your tsconfig.json:
+```json
+{
+  "compilerOptions": {
+    "paths": {
+      "chrome://userchromejs/content/uc_api.sys.mjs": [
+        "./node_modules/@types/fx-autoconfig/index.d.ts"
+      ]
+    }
+  }
+}
+```
 
 Helpers are available as a namespace object - the whole namespace can be imported to module scripts as follows:
 
