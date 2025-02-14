@@ -871,13 +871,13 @@ The return value is `null` if a matching script was not found. Otherwise, the re
 ### Scripts.reloadStyleSheet(name, sheet_mode) -> `Boolean`
 
 ```js
-UC_API.Scripts.updateStyleSheet() // reloads userChrome.css
+UC_API.Scripts.reloadStyleSheet() // reloads userChrome.css
 
  // reloads a style in author-mode stylesheets list with matching name
-UC_API.Scripts.updateStyleSheet("userChrome.au.css","author")
+UC_API.Scripts.reloadStyleSheet("userChrome.au.css","author")
 
  // reloads a style in agent-mode stylesheets list with matching name
-UC_API.Scripts.updateStyleSheet("userChrome.ag.css","agent")
+UC_API.Scripts.reloadStyleSheet("userChrome.ag.css","agent")
 ```
 
 Argument `filename` is relative to `resources` folder, but you can use `../` prefix to get back to `chrome` folder.
