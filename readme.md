@@ -656,7 +656,7 @@ let details = {
   command: (window,commandEvent) => console.log("Hello from " + window.document.title);
 }
 
-UC_API.Hotkeys.define(details).autoAttach({suppressOriginalKey: true});
+UC_API.Hotkeys.define(details).autoAttach({suppressOriginal: true});
 // This defines the key `Ctrl+T`, attaches it to all current and future main browser windows and disables original newtab key.
 
 ```
