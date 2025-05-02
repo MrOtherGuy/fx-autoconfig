@@ -194,6 +194,13 @@ export class FileSystem{
     }
     return IOUtils.writeUTF8( fileName, content, options );
   }
+  static async deleteFile(path){
+    await IOUtils.remove(path);
+  }
+  static async deleteDir(path, empty=false){
+    if(empty)await IOUtils.remove(path);
+    else await IOUtils.remove(path,{recursive:true});
+  }
   static createFileURI(fileName){
     if(!fileName){
       return FileSystem.#RESOURCE_URI
