@@ -195,11 +195,13 @@ export class FileSystem{
     return IOUtils.writeUTF8( fileName, content, options );
   }
   static async deleteFile(path){
-    await IOUtils.remove(path);
+    const fileName = FileSystem.#appendToBaseURI(path);
+    await IOUtils.remove(fileName);
   }
   static async deleteDir(path, empty=false){
-    if(empty)await IOUtils.remove(path);
-    else await IOUtils.remove(path,{recursive:true});
+    const fileName = FileSystem.#appendToBaseURI(path);
+    if(empty)await IOUtils.remove(fileName);
+    else await IOUtils.remove(fileName,{recursive:true});
   }
   static createFileURI(fileName){
     if(!fileName){
