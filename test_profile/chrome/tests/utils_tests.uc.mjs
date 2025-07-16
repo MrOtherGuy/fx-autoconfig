@@ -88,6 +88,40 @@ new Test(
   () => { return SharedStorage.test_module_script_ESM.y }
 ).expect(42),
 
+new Test(
+  "SharedStorage_size_equals_2",
+  () => { return Object.keys(SharedStorage.debug()).length }
+).expect(2),
+
+new Test(
+  "SharedStorage_is_empty",
+  () => {
+    SharedStorage.clear();
+    return Object.keys(SharedStorage.debug()).length
+  }
+).expect(0),
+
+new Test(
+  "SharedStorage_storageChange_event",
+  () => {
+    return new Promise((resolve,reject) => {
+      SharedStorage.set("test_thing",123);
+      let listener = changes => {
+        SharedStorage.onChanged.removeListener(listener);
+        if(SharedStorage.onChanged.hasListener(listener)){
+          reject("SharedStorage listener still exists!")
+        }else{
+          resolve(changes);
+        }
+      };
+      SharedStorage.onChanged.addListener(listener);
+      setTimeout(() => { SharedStorage.test_thing = 42 },10)
+    })
+  }
+).expectAsync(changes => {
+  return changes.test_thing.oldValue === 123 && changes.test_thing.newValue === 42
+}),
+
 // Does _ucUtils give us correct brandName
 new Test(
   "brandName",

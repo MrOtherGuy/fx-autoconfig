@@ -1,7 +1,101 @@
 import { FileSystem } from "chrome://userchromejs/content/fs.sys.mjs";
 export { FileSystem };
-export const SharedGlobal = {};
-ChromeUtils.defineLazyGetter(SharedGlobal,"widgetCallbacks",() => {return new Map()});
+const WidgetCallbacks = new Map();
+
+class Storage{
+  #listeners;
+  #onChanged;
+  #storage = {};
+  #boundGet;
+  #boundSet;
+  #boundRemove;
+  #boundClear;
+  #debug;
+  constructor(){
+    this.#listeners = new Set();
+    this.onChanged = Object.freeze({
+      addListener: fun => { this.#listeners.add(fun) },
+      removeListener: fun => { this.#listeners.delete(fun) },
+      hasListener: fun => { return this.#listeners.has(fun) }
+    });
+    this.#boundGet = this.get.bind(this);
+    this.#boundSet = this.set.bind(this);
+    this.#boundClear = this.clear.bind(this);
+    this.#boundRemove = this.remove.bind(this);
+    this.#debug = this.debug.bind(this);
+  }
+  get(key){
+    return this.#storage[key]
+  }
+  set(key,value){
+    let changes = {[key]: { oldValue: this.#storage[key], newValue: value }};
+    this.#storage[key] = value;
+    this.#notifyListeners(changes);
+  }
+  #notifyListeners(changes){
+    for(let fun of this.#listeners){
+      fun(changes)
+    }
+  }
+  remove(key){
+    if(this.#storage.hasOwnProperty(key)){
+      let changes = {[key]: { oldValue: this.#storage[key], newValue: undefined }};
+      delete this.#storage[key];
+      this.#notifyListeners(changes);
+      return true
+    }
+    return false
+  }
+  clear(){
+    let changes = {};
+    for(let [key,val] of Object.entries(this.#storage)){
+      changes[key] = { oldValue: val, newValue: undefined }
+      delete this.#storage[key]
+    }
+    if(Object.keys(changes).length > 0){
+      this.#notifyListeners(changes);
+      return true
+    }
+    return false
+  }
+  debug(){
+    return Object.assign({},this.#storage)
+  }
+  static getMethod(target,prop){
+    if(prop === "debug"){
+      return target.#debug
+    }
+    if(prop === "get"){
+      return target.#boundGet
+    }
+    if(prop === "set"){
+      return target.#boundSet
+    }
+    if(prop === "remove"){
+      return target.#boundRemove
+    }
+    if(prop === "clear"){
+      return target.#boundClear
+    }
+  }
+}
+
+export const SharedStorage = new Proxy(new Storage(),{
+  get(target,key){
+    if(key === "onChanged"){
+      return target.onChanged
+    }
+    if(key in target){
+      return Storage.getMethod(target,key)
+    }
+    return Reflect.apply(target.get,target,[key])
+  },
+  set(target,key,value){
+    target.set(key,value);
+    return value
+  }
+});
+
 const lazy = {
   startupPromises: new Set()
 };
@@ -594,7 +688,7 @@ export function createWidget(desc){
   }
   const callback = desc.callback;
   if(typeof callback === "function"){
-    SharedGlobal.widgetCallbacks.set(desc.id,callback);
+    WidgetCallbacks.set(desc.id,callback);
   }
   return CUI.createWidget({
     id: desc.id,
@@ -615,10 +709,11 @@ export function createWidget(desc){
       }
       
       if(typeof callback === "function"){
-        const allEvents = !!desc.allEvents;
-        toolbaritem.addEventListener("click",(ev) => {
-          allEvents || ev.button === 0 && SharedGlobal.widgetCallbacks.get(ev.target.id)(ev,ev.target.ownerGlobal)
-        })
+        if(desc.allEvents){
+          toolbaritem.addEventListener("click",(ev) => WidgetCallbacks.get(ev.target.id)(ev,ev.target.ownerGlobal))
+        }else{
+          toolbaritem.addEventListener("click",(ev) => ev.button === 0 && WidgetCallbacks.get(ev.target.id)(ev,ev.target.ownerGlobal))
+        }
       }
       for (let attr in desc){
         if(attr != "callback" && !(attr in props)){

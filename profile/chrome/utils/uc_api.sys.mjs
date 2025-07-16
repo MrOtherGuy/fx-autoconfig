@@ -1,7 +1,7 @@
 const {
   Hotkey,
   windowUtils,
-  SharedGlobal,
+  SharedStorage,
   Pref,
   FileSystem,
   restartApplication,
@@ -23,7 +23,7 @@ export {
   FileSystem,
   Hotkey as Hotkeys,
   Pref as Prefs,
-  SharedGlobal as SharedStorage,
+  SharedStorage,
   windowUtils as Windows
 }
 
