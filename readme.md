@@ -175,7 +175,7 @@ directory using chrome url.
 
 # API
 
-This manager is NOT entirely compatible with all existing userScripts - specifically scripts that expect a global `_uc` object or something similar to be available. This manager does export a `_ucUtils` object to window objects which is described in [api definition section](#uc_api).
+This manager is NOT entirely compatible with all existing userScripts - specifically scripts that expect a global `_uc` object or something similar to be available. This manager does export a `UC_API` object to window objects which is described in [api definition section](#uc_api).
 
 Additionally, version `0.10.0` is very much incompatible with earlier versions, because `_ucUtils` is replaced with `UC_API`.
 
@@ -217,7 +217,7 @@ This would execute in all documents, excecpt main window - notice "main" is excl
 
 In addition, scripts can be marked as `@backgroundmodule` in which case they are executed "outside" of any document when the the loader reads the file. See [backgroundmodule](#backgroundmodule) section below.
 
-Some convenience functions are provided for scripts to use in global `_ucUtils` object available in windows.
+Some convenience functions are provided for scripts to use in global `UC_API` object available in windows.
 
 ## @backgroundmodule
 
@@ -273,15 +273,15 @@ Although window scoped module scripts (.uc.mjs) automatically gain access to it 
 (This section only applies to pre 0.10.0 versions and somewhat if you try to import utils.sys.mjs directly)
 
 **Note for .uc.mjs scripts!**
-Because your script is running in its own module scope within a window the module imported with an `import` statement above is NOT the same instance of the object as what you would get automatically via `_ucUtils`. The methods within are the same, but since it is a different object its internal properties have not been initialized by `boot.sys.mjs` so some functionality is missing - such as access to custom script info via `.getScriptData()`
+Because your script is running in its own module scope within a window the module imported with an `import` statement above is NOT the same instance of the object as what you would get automatically via `UC_API`. The methods within are the same, but since it is a different object its internal properties have not been initialized by `boot.sys.mjs` so some functionality is missing - such as access to custom script info via `.getScriptData()`
 
 You can instead use ChromeUtils to import the same object from the global object:
 
 ```js
-const { _ucUtils } = ChromeUtils.importESModule("chrome://userchromejs/content/utils.sys.mjs")
+const UC_API = ChromeUtils.importESModule("chrome://userchromejs/content/uc_api.sys.mjs")
 ```
 
-Or indeed just use `_ucUtils` from the window object.
+Or indeed just use `UC_API` from the window object.
 
 The same behavior applies to all modules imported from .uc.mjs module scopes via `import` statements.
 
@@ -668,15 +668,16 @@ Display and receive input to and from browser notification toolbar (not to be co
 ### UC_API.Notifications.show(details) -> `Promise`
 
 ```js
-_ucUtils.showNotification(
+UC_API.Notifications.show(
   {
-    label : "Message content",  // text shown in the notification
-    type : "something",         // opt identifier for this notification
-    priority: "info",           // opt one of ["system","critical","warning","info"]
-    window: window.top ,        // opt reference to a chromeWindow
-    tab: gBrowser.selectedTab,  // opt reference to a tab
-    buttons: [...],             // opt array of button descriptors
-    callback: () => {}          // opt function to be called when notification is dismissed
+    label : "Message content",    // text shown in the notification
+    type : "something",           // opt identifier for this notification
+    priority: "info",             // opt one of ["system","critical","warning","info"]
+    window: window.top ,          // opt reference to a chromeWindow
+    tab: gBrowser.selectedTab,    // opt reference to a tab
+    buttons: [...],               // opt array of button descriptors
+    callback: () => {},           // opt function to be called when notification is dismissed
+    disableClickJackingProtection // opt boolean (defaults to false)
   }
 )
 ```
@@ -685,6 +686,8 @@ Priority defines the ordering and coloring of this notification. Notifications o
 If `window` key exists then the notification will be shown in that window. Otherwise it is shown in the last active window.
 
 If `tab` key exists then the notification will be shown in that tab only. Otherwise the notification is global to the window.
+
+If `disableClickJackingProtection` is `false` (default), then Firefox will not respond to button click shortly after the notification is created or shortly after the window becomes focused - effectively the button can't be clicked in non-focused windows.
 
 See more about `buttons` and `callback` keys at [notificationbox.js](https://searchfox.org/mozilla-central/rev/3f782c2587124923a37c750b88c5a40108077057/toolkit/content/widgets/notificationbox.js#113)
 
@@ -710,13 +713,13 @@ Returns a representation of the pref wrapped into an object with properties:
 let myPref = UC_API.Prefs.get("userChrome.scripts.disabled");
 /*
 * {
-*   exists() // true|false indicating if this pref exists
-*   name     // string - the called pref name
-*   value    // <number|string|boolean> | `null` - null means pref with this name could not be read
-* set value() // same as _ucUtils.prefs.set(name,value)
-*   hasUserValue() // true|false indicating if this has user set value
-*   type     // "string"|"boolean"|"number"|"invalid"
-*   reset()  // resets this pref to its default value
+*   exists()        // true|false indicating if this pref exists
+*   name            // string - the called pref name
+*   value           // <number|string|boolean> | `null` - null means pref with this name could not be read
+* set value()       // same as UC_API.Prefs.set(name,value)
+*   hasUserValue()  // true|false indicating if this has user set value
+*   type            // "string"|"boolean"|"number"|"invalid"
+*   reset()         // resets this pref to its default value
 * }
 */
 
@@ -925,7 +928,7 @@ The **class** of elements using this will by default be "toolbarbutton-1 chromec
 
 The **style** info will be added as inline style to all elements of that widget. The image will be loaded as centered background-image in toolbaritems and as list-style-image in toolbarbuttons.
 
-The **callback** function will be stored in _ucUtils.sharedGlobal mapped to the provided id. Clicking the button will call the callback which will receive two arguments: **event** (click) and **window** which is a reference to the window object where that instance of the widget is.
+Clicking the button will call the `callback` function which will receive two arguments: **event** (click) and **window** which is a reference to the window object where that instance of the widget is. The callback is stored internally using the provided widget id, so you should use unique-ish ids.
 
 If the callback property is not a function, then the widget will be just a passive element.
 
@@ -959,13 +962,35 @@ UC_API.Utils.loadURI(window,{
 Return a boolean indicating if the operation was successful. "url" and "where" properties are mandatory - others are optional. 
 
 ## SharedStorage
-If scripts need to store information to a global object they can get reference to that as follows:
+In-memory, non-persistent storage area that can be used to share data between scripts.
+
+The SharedStorage object is a Proxy for a class which actually stores the data. SharedStorage works much like the storage API in WebExtensions.
 
 ```js
-let global = UC_API.SharedStorage
+let myThing = { thing: 123 };
+UC_API.SharedStorage.MyStuff = myThing;
+
+UC_API.SharedStorage.MyStuff === myThing; // true
+UC_API.SharedStorage.get("MyStuff") === myThing; // true
+
 ```
 
-Note that data stored here is only available in memory and does not persist on disk.
+The `onChanged` property of SharedStorage object can be used to add listener for storage change "events".
+
+```js
+UC_API.SharedStorage.MyStuff1 = "Test-1";
+UC_API.SharedStorage.onChanged.addListener(console.log);
+
+UC_API.SharedStorage.MyStuff2 = "Test-2";
+// { MyStuff1: { oldValue: undefined, newValue: "Test-2" } }
+
+UC_API.SharedStorage.clear();
+// { MyStuff1: { oldValue: "Test-1", newValue: undefined }, MyStuff2: { oldValue: "Test-2", newValue: undefined } }
+```
+
+Note that only removal or assignment of the *top-level* keys trigger change events. If you were to change properties of an object that already exists in the storage, then no change events will fire.
+
+While similar to WebExtensions storage API which has async methods, the methods in SharedStorage are synchronous. **Currently** the onchange event callback is also executed synchronously, but don't expect it to stay that way.
 
 ## Windows
 
