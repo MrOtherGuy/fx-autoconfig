@@ -858,7 +858,8 @@ export async function showNotification(description){
       priority: priority,
       eventCallback: typeof description.callback === "function" ? description.callback : null
     },
-    description.buttons
+    description.buttons,
+    description.disableClickJackingProtection
   );
 }
 
