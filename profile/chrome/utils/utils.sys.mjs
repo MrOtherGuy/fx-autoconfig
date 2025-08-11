@@ -96,12 +96,35 @@ export const SharedStorage = new Proxy(new Storage(),{
   }
 });
 
+export function defineModuleGettersWithFallback(target, description){
+  for(let [name, value] of Object.entries(description)){
+    const { url, fallback } = value;
+    Object.defineProperty(target,name,{
+      get: () => {
+        let module;
+        try{
+          module = ChromeUtils.importESModule(url);
+        }catch(e){
+          console.warn(e);
+          module = ChromeUtils.importESModule(fallback);
+        }
+        Object.defineProperty(target,name,{ value: module[name], configurable: false });
+        return module[name]
+      },
+      configurable: true
+    })
+  }
+}
+
 const lazy = {
   startupPromises: new Set()
 };
-ChromeUtils.defineESModuleGetters(lazy,{
-  CustomizableUI: "resource:///modules/CustomizableUI.sys.mjs"
-});
+defineModuleGettersWithFallback(lazy,{
+  CustomizableUI: {
+    url: "moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs",
+    fallback: "resource:///modules/CustomizableUI.sys.mjs"
+  }
+})
 
 export class Hotkey{
   #matchingSelector;
