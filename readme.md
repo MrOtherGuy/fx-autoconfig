@@ -128,7 +128,7 @@ The startup-cache folder can be found as follows:
 
 # Usage
 
-The loader module `boot.sys.mjs` looks for three kinds of files in your scripts directory ("JS" by default - can be changed in `chrome.manifest`):
+The loader module `boot.sys.mjs` looks for three kinds of files in your scripts directory (`<profile>/chrome/JS/` by default - can be changed in `chrome.manifest`):
 
 * `<filename>.uc.js` - classic script which will be synchronously injected into target documents.
 * `<filename>.uc.mjs` (new in 0.8) - script which will be loaded into target documents asynchronously as ES6 module.
@@ -138,17 +138,27 @@ Additionally (".uc.js") scripts can be marked as background-module by tagging th
 
 Just put any such files into the `JS` directory. The `JS` directory should be in the same directory where userChrome.css would be. If you wish to change the directory name then you need to modify the `chrome.manifest` file inside `utils` directory. For example change `../JS/` to `../scripts/` to make Firefox load scripts from "scripts" folder.
 
-At runtime, individual scripts can be toggled on/off from menubar -> tools -> userScripts. Note that toggling requires Firefox to be restarted, for which a "restart now" -button is provided. The button clears startup-cache so you don't need to worry about that.
+At runtime, individual scripts can be toggled on/off from menubar -> tools -> userScripts. Note that toggling requires Firefox to be restarted, for which a "Restart and clear startup cache" -button is provided in the menu.
 
 For window scoped scripts (classic `.uc.js` and `.uc.mjs`) it the toggling should take effect when a new window is opened. Any effects in the old window will persist though.
 
 A global preference to toggle all scripts is `userChromeJS.enabled`. This will disable all scripts but leaves the restart-button in the custom menu available.
 
+### Script loading
+
+Window scoped scripts and styles are executed (or imported when using .uc.mjs files) at `DOMContentLoaded` event of the top-level window. Subsequent DOMContentLoaded events in the same window - such as those coming from sub-documents, for example documents in the content area of the main-window, do not trigger script execution.
+
+This behavior can be changed by creating a new boolean pref `userChromeJS.persistent_domcontent_callback` with value `true`. Note that this is a "global" toggle and cannot be scoped to just specific scripts or styles.
+
+When the pref is set `true`, then scripts and styles will also get injected into sub-documents if their `@include` target matches the document url.
+
+Scripts and styles will still only be injected into parent-process documents, which includes things like `about:preferences`, `about:support` and `about:addons` - but does not include `about:newtab` and few other about: pages, which are run in a separate, less privileged process.
+
 ## Styles
 
 From version `0.8.5` onwards the loader also supports injection of styles. The default directory where loader looks for them is `chrome/CSS/` which again can be re-mapped by modifying `chrome/utils/chrome.manifest`
 
-File name of styles must end with `.uc.css` which the loader will pick up automatically - just like scripts. By default, scripts are injected in *author* mode only into browser.xhtml - you can register other targets using the header @include directives just like scripts.
+File name of styles must end with `.uc.css` which the loader will pick up automatically - just like scripts. By default, scripts are injected in *author* mode and only into browser.xhtml - you can register other targets using the header @include directives just like scripts.
 
 Alternatively you can use `@stylemode      agent_sheet` directive in header to make loader register it as agent style. User styles are not supported currently - just use userChrome.css for that.
 
