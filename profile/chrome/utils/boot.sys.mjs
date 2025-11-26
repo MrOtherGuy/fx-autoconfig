@@ -1,7 +1,7 @@
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 import { loaderModuleLink, Pref, FileSystem, windowUtils, showNotification, startupFinished, restartApplication, escapeXUL, toggleScript } from "chrome://userchromejs/content/utils.sys.mjs";
 
-const FX_AUTOCONFIG_VERSION = "0.10.8";
+const FX_AUTOCONFIG_VERSION = "0.10.9";
 console.warn( "Browser is executing custom scripts via autoconfig" );
 
 const APP_VARIANT = (() => {
@@ -533,13 +533,20 @@ class UserChrome_js{
     return
   }
   observe(aSubject, aTopic, aData) {
-    aSubject.addEventListener('DOMContentLoaded', this, {once: !this.PERSISTENT_DOMCONTENT_CALLBACK, capture: true});
+    if(aSubject.document.isUncommittedInitialDocument){
+      const parent = aSubject.parent;
+      aSubject.addEventListener("DOMContentLoaded",()=>{
+        parent.addEventListener("DOMContentLoaded",this,{once: !this.PERSISTENT_DOMCONTENT_CALLBACK, capture: true})
+      },{once:true})
+    }else{
+      aSubject.addEventListener('DOMContentLoaded', this, {once: !this.PERSISTENT_DOMCONTENT_CALLBACK, capture: true});
+    }
   }
   
   handleEvent(aEvent){
     switch (aEvent.type){
       case "DOMContentLoaded":
-        this.onDOMContent(aEvent.originalTarget);
+        this.onDOMContent(aEvent.target);
         break;
       default:
         console.warn(new Error("unexpected event received",{cause:aEvent}));
