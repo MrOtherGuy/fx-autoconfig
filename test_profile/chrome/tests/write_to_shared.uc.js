@@ -4,4 +4,4 @@
 // @loadOrder 1
 // @onlyonce
 // ==/UserScript==
-_ucUtils.sharedGlobal.test_utils = { x: 42 }
+UC_API.SharedStorage.test_utils = { x: 42 }

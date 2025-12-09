@@ -12,7 +12,7 @@
 // ==/UserScript==
 import { Cheese } from "chrome://userscripts/content/modules/imported_print.mjs";
 import { Test } from "chrome://userscripts/content/000_test_runner.sys.mjs";
-import { _ucUtils as importedUCUtils } from "chrome://userchromejs/content/utils.sys.mjs";
+import * as UC_API from "chrome://userchromejs/content/uc_api.sys.mjs";
 
 const PROMISES = [
   new Test("non_background_mjs_got_cheese",()=>{
@@ -20,16 +20,16 @@ const PROMISES = [
   }).expect("emmental"),
   
   new Test("non_background_mjs_got_ucUtils_from_window",()=>{
-    return _ucUtils.brandName
+    return UC_API.Runtime.brandName
   }).expect("Firefox Nightly"),
   
   new Test("non_background_mjs_fallback_brandName",()=>{
-    return importedUCUtils.brandName
+    return UC_API.Runtime.brandName
   }).expect("Firefox Nightly"),
   
   new Test("non_background_mjs_fallback_windows_length",()=>{
-    return importedUCUtils.windows.getAll(false).length > 0
-  }).expect(true),
+    return UC_API.Windows.getAll(false).length > 0
+  }).expect(true)
 ];
 
 Test.waitForTestSet(PROMISES)

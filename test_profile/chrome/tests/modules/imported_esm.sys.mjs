@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name           test_imported_esm
 // ==/UserScript==
-import{ _ucUtils } from "chrome://userchromejs/content/utils.sys.mjs";
+import{ Runtime } from "chrome://userchromejs/content/uc_api.sys.mjs";
 const some = {
   test_value: 42,
-  loaderVersion: _ucUtils.version,
+  loaderVersion: Runtime.loaderVersion,
   setToX: function(x){
     this.test_value = x 
   }

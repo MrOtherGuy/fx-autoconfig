@@ -75,6 +75,8 @@ const TEST_FILES = [
 ];
 console.info("%crunning UC_API tests...","color: rgb(120,160,240)");
 
+const TEST_SYMBOL_KEY = Symbol("test-symbol");
+
 const PROMISES = [
 // Can we read data from SharedStorage
 // The value should have been set by write_to_shared.uc.js which should have run before this one.
@@ -90,14 +92,14 @@ new Test(
 
 new Test(
   "SharedStorage_size_equals_2",
-  () => { return Object.keys(SharedStorage.debug()).length }
+  () => { return SharedStorage.keys().length }
 ).expect(2),
 
 new Test(
   "SharedStorage_is_empty",
   () => {
     SharedStorage.clear();
-    return Object.keys(SharedStorage.debug()).length
+    return SharedStorage.keys().length
   }
 ).expect(0),
 
@@ -115,11 +117,16 @@ new Test(
         }
       };
       SharedStorage.onChanged.addListener(listener);
-      setTimeout(() => { SharedStorage.test_thing = 42 },10)
+      setTimeout(() => {
+        SharedStorage.set(TEST_SYMBOL_KEY,"test-value");
+        SharedStorage.test_thing = 42;
+      },10)
     })
   }
 ).expectAsync(changes => {
-  return changes.test_thing.oldValue === 123 && changes.test_thing.newValue === 42
+  return changes.test_thing.oldValue === 123
+      && changes.test_thing.newValue === 42
+      && Object.getOwnPropertySymbols(changes)[0] === TEST_SYMBOL_KEY
 }),
 
 // Does _ucUtils give us correct brandName
