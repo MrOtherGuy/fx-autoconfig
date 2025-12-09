@@ -1,16 +1,32 @@
 import { FileSystem } from "chrome://userchromejs/content/fs.sys.mjs";
 export { FileSystem };
+
+const lazy = {
+  startupPromises: new Set()
+};
+defineModuleGettersWithFallback(lazy,{
+  CustomizableUI: {
+    url: "moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs",
+    fallback: "resource:///modules/CustomizableUI.sys.mjs"
+  }
+});
+ChromeUtils.defineESModuleGetters(lazy, {
+    requestIdleCallback: "resource://gre/modules/Timer.sys.mjs"
+});
 const WidgetCallbacks = new Map();
 
 class Storage{
   #listeners;
   #onChanged;
-  #storage = {};
+  #storage;
   #boundGet;
   #boundSet;
   #boundRemove;
   #boundClear;
   #debug;
+  #changeset;
+  #idleCallback;
+  #boundKeys;
   constructor(){
     this.#listeners = new Set();
     this.onChanged = Object.freeze({
@@ -18,45 +34,67 @@ class Storage{
       removeListener: fun => { this.#listeners.delete(fun) },
       hasListener: fun => { return this.#listeners.has(fun) }
     });
+    this.#storage = {};
+    this.#changeset = new Map();
+    this.#idleCallback = 0;
     this.#boundGet = this.get.bind(this);
     this.#boundSet = this.set.bind(this);
     this.#boundClear = this.clear.bind(this);
     this.#boundRemove = this.remove.bind(this);
     this.#debug = this.debug.bind(this);
+    this.#boundKeys = this.keys.bind(this);
   }
-  get(key){
-    return this.#storage[key]
+  get(aKey){
+    return this.#storage[aKey]
   }
-  set(key,value){
-    let changes = {[key]: { oldValue: this.#storage[key], newValue: value }};
-    this.#storage[key] = value;
-    this.#notifyListeners(changes);
+  keys(){
+    return Object.getOwnPropertySymbols(this.#storage).concat(Object.keys(this.#storage))
   }
-  #notifyListeners(changes){
-    for(let fun of this.#listeners){
-      fun(changes)
+  set(aKey,aValue){
+    const key = typeof aKey === "symbol" ? aKey : aKey.toString();
+    let oldValue = this.#storage[key];
+    this.#storage[key] = aValue;
+    if(this.#listeners.size > 0){
+      this.#changeset.set(key,{ oldValue: this.#changeset.get(key)?.oldValue ?? oldValue, newValue: aValue });
+      if(this.#idleCallback === 0){
+        this.#idleCallback = lazy.requestIdleCallback(()=>this.#onIdleCallback())
+      }
     }
   }
-  remove(key){
-    if(this.#storage.hasOwnProperty(key)){
-      let changes = {[key]: { oldValue: this.#storage[key], newValue: undefined }};
+  #onIdleCallback(){
+    const cset = Object.fromEntries(this.#changeset.entries());
+    this.#changeset.clear();
+    for(let fun of this.#listeners){
+      try{
+        fun(cset)
+      }catch(e){
+        console.error(e)
+      }
+    }
+    this.#idleCallback = 0;
+  }
+  remove(aKey){
+    const key = typeof aKey === "symbol" ? aKey : aKey.toString();
+    if(Object.hasOwn(this.#storage,key)){
+      let oldValue = this.#storage[key];
       delete this.#storage[key];
-      this.#notifyListeners(changes);
+      if(this.#listeners.size > 0){
+        this.#changeset.set(key,{ oldValue: this.#changeset.get(key)?.oldValue ?? oldValue, newValue: undefined });
+        if(this.#idleCallback > 0){
+          return
+        }
+        this.#idleCallback = lazy.requestIdleCallback(()=>this.#onIdleCallback())
+      }
       return true
     }
     return false
   }
   clear(){
-    let changes = {};
-    for(let [key,val] of Object.entries(this.#storage)){
-      changes[key] = { oldValue: val, newValue: undefined }
-      delete this.#storage[key]
+    let keys = this.keys();
+    for(let key of keys){
+      this.remove(key)
     }
-    if(Object.keys(changes).length > 0){
-      this.#notifyListeners(changes);
-      return true
-    }
-    return false
+    return keys.length > 0
   }
   debug(){
     return Object.assign({},this.#storage)
@@ -76,6 +114,9 @@ class Storage{
     }
     if(prop === "clear"){
       return target.#boundClear
+    }
+    if(prop === "keys"){
+      return target.#boundKeys
     }
   }
 }
@@ -115,16 +156,6 @@ export function defineModuleGettersWithFallback(target, description){
     })
   }
 }
-
-const lazy = {
-  startupPromises: new Set()
-};
-defineModuleGettersWithFallback(lazy,{
-  CustomizableUI: {
-    url: "moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs",
-    fallback: "resource:///modules/CustomizableUI.sys.mjs"
-  }
-})
 
 export class Hotkey{
   #matchingSelector;
@@ -594,6 +625,25 @@ export class ScriptInfo{
     const headerText = ScriptData.extractScriptHeader(aStringAsFSResult);
     const scriptData = new ScriptData(aName, headerText, headerText.length > aStringAsFSResult.size - 2, isStyle);
     return ScriptInfo.fromScript(scriptData, false)
+  }
+}
+
+export class WindowActors{
+  constructor(){
+    if(new.target){
+      throw new TypeError("WindowActors is not a constructor")
+    }
+  }
+  static get(actor,aBrowser){
+    let browser;
+    if(aBrowser){
+      browser = aBrowser
+    }else{
+      let win = Services.wm.getMostRecentBrowserWindow(windowUtils.mainWindowType);
+      browser = win.gBrowser.selectedBrowser
+    }
+    let windowGlobal = browser.browsingContext.currentWindowGlobal;
+    return windowGlobal.getActor(actor)
   }
 }
 

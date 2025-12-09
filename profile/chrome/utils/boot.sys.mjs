@@ -1,8 +1,13 @@
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 import { loaderModuleLink, Pref, FileSystem, windowUtils, showNotification, startupFinished, restartApplication, escapeXUL, toggleScript } from "chrome://userchromejs/content/utils.sys.mjs";
 
-const FX_AUTOCONFIG_VERSION = "0.10.9";
+const FX_AUTOCONFIG_VERSION = "0.10.10";
 console.warn( "Browser is executing custom scripts via autoconfig" );
+
+const lazy = {};
+ChromeUtils.defineESModuleGetters(lazy, {
+    ActorManagerParent: 'resource://gre/modules/ActorManagerParent.sys.mjs'
+});
 
 const APP_VARIANT = (() => {
   let is_tb = AppConstants.BROWSER_CHROME_URL.startsWith("chrome://messenger");
@@ -22,6 +27,7 @@ const BROWSERCHROME = (() => {
 
 const PREF_ENABLED = 'userChromeJS.enabled';
 const PREF_SCRIPTSDISABLED = 'userChromeJS.scriptsDisabled';
+const PREF_EXPERIMENTAL = 'userChromeJS.experimental.enabled';
 
 function getDisabledScripts(){
   return Services.prefs.getStringPref(PREF_SCRIPTSDISABLED,"").split(",")
@@ -75,7 +81,14 @@ class ScriptData {
       : null;
     this.useFileURI = /\/\/ @usefileuri\b/.test(headerText);
     this.noExec = isStyle || noExec;
-    
+    // Looks a bit funky, but we only allow windowActor if matches is also specified
+    let windowActor = isStyle ? null : headerText.match(/\/\/ @WindowActor\s+(.+)\s*$/im)?.[1];
+    this.actorMatches = windowActor
+      ? headerText.match(/\/\/ @WindowActorMatches\s+(.+)\s*$/im)?.[1]
+      : null;
+    this.windowActor = this.actorMatches
+      ? windowActor
+      : null;
     if(this.inbackground || this.styleSheetMode === "agent" || (!isStyle && noExec)){
       this.regex = null;
       this.loadOrder = -1;
@@ -193,6 +206,29 @@ class ScriptData {
       console.warn(`Script '${aScript.filename}' tried to register a manifest but requested file '${aScript.manifest}' doesn't exist`);
     }
   }
+  static buildScriptActorDefinition(aActorName,aMatches){
+    let matches = JSON.parse(aMatches);
+    if(!Array.isArray(matches)){
+      matches = [matches]
+    }
+    if(!matches.every(a => typeof a === "string")){
+      throw new Error(`${aScript.filename}: WindowActorMatches for '${aActorName}' includes non-strings`)
+    }
+    return {
+      parent: {
+        esModuleURI: `chrome://userscripts/content/${aActorName}/${aActorName}Parent.sys.mjs`
+      },
+      child: {
+        esModuleURI: `chrome://userscripts/content/${aActorName}/${aActorName}Child.sys.mjs`,
+        events: {
+          DOMContentLoaded: {}
+        }
+      },
+      matches: matches,
+      remoteTypes: ["privilegedabout",null],
+      includeChrome: true
+    }
+  }
   static extractScriptHeader(aFSResult){
     return aFSResult.content()
       .match(/^\/\/ ==UserScript==\s*[\n\r]+(?:.*[\n\r]+)*?\/\/ ==\/UserScript==\s*/m)?.[0] || ""
@@ -290,21 +326,46 @@ class UserChrome_js{
     this.styles = [];
     this.SESSION_RESTORED = false;
     this.IS_ENABLED = Services.prefs.getBoolPref(PREF_ENABLED,false);
+    this.EXPERIMENTS_ENABLED = Services.prefs.getBoolPref(PREF_EXPERIMENTAL,false);
     this.isInitialWindow = true;
     this.initialized = false;
     this.init();
   }
-  registerScript(aScript,isDisabled){
+  registerScript(aScript,isDisabled,aBuiltActorMap){
     if(aScript.type === "script"){
       this.scripts.push(aScript);
     }else{
       this.styles.push(aScript);
     }
-    if(!isDisabled && aScript.manifest){
+    if(isDisabled){
+      return true
+    }
+    if(aScript.manifest){
       try{
         ScriptData.registerScriptManifest(aScript);
       }catch(ex){
         console.error(new Error(`@ ${aScript.filename}`,{cause:ex}));
+      }
+    }
+    if(aScript.windowActor){
+      if(this.EXPERIMENTS_ENABLED){
+        const { windowActor } = aScript;
+        if(!/[A-Za-z][A-Za-z0-9_]*/.test(windowActor)){
+          console.warn(`${aScript.filename}: WindowActor name '${windowActor}' is not acceptable`)
+          return isDisabled
+        }
+        if(aBuiltActorMap.has(windowActor)){
+          console.warn(`${aScript.filename}: WindowActor '${windowActor}' already in use `)
+          return isDisabled
+        }
+        try{
+          let def = ScriptData.buildScriptActorDefinition(windowActor,aScript.actorMatches);
+          aBuiltActorMap.set(windowActor,def);
+        }catch(ex){
+          console.error(new Error(`@ ${aScript.filename}`,{cause:ex}));
+        }
+      }else{
+        console.warn(`fx-autoconfig: Script '${aScript.filename}' tries to use WindowActor - an experimental feature that is currently disabled.`)
       }
     }
     return isDisabled
@@ -328,11 +389,12 @@ class UserChrome_js{
     const disabledScripts = getDisabledScripts();
     // load script data
     const scriptDir = FileSystem.getScriptDir();
+    const windowActorDefinitions = new Map();
     if(scriptDir.isDirectory()){
       for(let entry of scriptDir){
         if (/^[A-Za-z0-9]+.*(\.uc\.js|\.uc\.mjs|\.sys\.mjs)$/i.test(entry.leafName)) {
           let script = ScriptData.fromScriptFile(entry);
-          if(this.registerScript(script,disabledScripts.includes(script.filename))){
+          if(this.registerScript(script,disabledScripts.includes(script.filename),windowActorDefinitions)){
             continue // script is disabled
           }
           if(script.inbackground){
@@ -359,6 +421,10 @@ class UserChrome_js{
         }
       }
       this.addAgentStyles(this.styles.filter(style => style.styleSheetMode === "agent" && !disabledScripts.includes(style.filename)));
+    }
+    if(this.EXPERIMENTS_ENABLED && windowActorDefinitions.size > 0){
+      lazy.ActorManagerParent.addJSWindowActors(Object.fromEntries(Array.from(windowActorDefinitions.entries())));
+      windowActorDefinitions.clear();
     }
     this.scripts.sort((a,b) => a.loadOrder - b.loadOrder);
     this.styles.sort((a,b) => a.loadOrder - b.loadOrder);
