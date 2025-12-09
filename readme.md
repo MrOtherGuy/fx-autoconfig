@@ -1080,6 +1080,130 @@ UC_API.Windows.waitWindowLoading(window)
 
 Since scripts run per window, `startupFinished` will be resolved once in *each window that called it* when ALL those windows have been restored. But `waitWindowLoading` will be resolved whenever the particular window that calls it has started up.
 
+## Experimental
+
+> New in `0.10.10`
+
+Experimental namespace provides access to features which are likely  unfinished, untested or without stable API.
+
+Experimental features can be enabled by setting `userChromeJS.experimental.enabled` to `true` and restarting Firefox.
+
+### WindowActors
+
+> New in `0.10.10`
+
+WindowActors feature allows communication between the main window process (where your scripts typically run) and child process like "about:home" or "about:newtab"
+
+The feature consists of two parts - a `@WindowActor <name>` script header and methods in `UC_API.Experimental.WindowActors`. You can read more about the WindowActor communication in [firefox-source-docs](https://firefox-source-docs.mozilla.org/dom/ipc/jsactors.html)
+
+An example WindowActor can be declared like this (works in ".uc.js", "uc.mjs" and ".sys.mjs") - say "test-actor.uc.js":
+
+```js
+// ==UserScript==
+// @WindowActor TestActor
+// @WindowActorMatches ["about:newtab","about:home"]
+// ==/UserScript==
+```
+
+This will tell the loader module to load the WindowActor definition files - one for parent-process side and one for child-process side - from a folder called `TestActor` (relative to your scripts folder).
+
+In your `TestActor` folder you need to create the actual actor definition files: `TestActorParent.sys.mjs` and `TestActorChild.sys.mjs` (Note: `.sys.mjs` extension) - The filenames are meaningful, if your script header told to create a `TestActor` then the folder name as well as the name of these definition files must match that.
+
+### Example files
+
+```txt
+chrome
+|__utils
+|__JS
+   |__TestActor
+   |  |__TestActorParent.sys.mjs
+   |  |__TestActorChild.sys.mjs
+   |__test_actor.uc.js
+```
+
+#### `../JS/test_actor.uc.js`
+
+The script header will declare a actor called `TestActor` and add a function to the main window (this script is executed in main window since it doesn't specify anything else with `@include`). When `getThing("top-site-button")` is executed, the function gets the specified window actor via Experimental.WindowActors API and then calls the `.sendQuery(...)` method.
+
+```js
+// ==UserScript==
+// @name test_actors
+// @WindowActor TestActor
+// @WindowActorMatches ["about:newtab","about:home"]
+// ==/UserScript==
+
+window.getThing = (...args) => {
+  UC_API.Experimental.WindowActors.get("TestActor")?.sendQuery("doThing",{args: args})
+  .then(console.log)
+}
+```
+
+#### `../JS/TestActor/TestActorParent.sys.mjs`
+
+The class name is again meaningful and must match the actor name.
+
+```js
+export class TestActorParent extends JSWindowActorParent {
+  constructor() {
+    super();
+  }
+  // You don't need to implement this method, because it's inherited from
+  // parent class. This exmample just forwards the arguments to the parent
+  // class and adds logging
+  async sendQuery(...args){
+    console.log("Querying...");
+    let reply = await super.sendQuery(...args);
+    console.log("Got reply!");
+    return reply
+  }
+  // Messages from child that are not responses to sendQuery are handled here
+  async receiveMessage(message) {
+    if(message.name === "event:info"){
+      console.log("Info from Child: ",message.data.info)
+    }else{
+      console.log("Message: ",message.name)
+    }
+  }
+}
+```
+
+#### `../JS/TestActor/TestActorChild.sys.mjs`
+
+The class name is again meaningful and must match the actor name.
+
+The `handleEvent()` gets called "automatically" because the loader script tells the browser to notify our class for "DOMContentLoaded" event.
+
+```js
+export class TestActorChild extends JSWindowActorChild {
+  constructor() {
+    super();
+  }
+  doThing(className){
+    return Array.from(this.document.querySelectorAll(className)).map(a => a.title)
+  }
+  async receiveMessage(message) {
+    if(message.name === "doThing"){
+      return this.doThing(...message.data.args)
+    }
+    throw new Error(`Unknown message type: '${message.name}'`)
+  }
+  actorCreated(){
+    // Do initialization work here if needed
+  }
+  handleEvent(event) {
+    // This is the only event we currently support in the loader
+    if (event.type === 'DOMContentLoaded') {
+      this.sendAsyncMessage("event:DOMContentLoaded",{info: "this happened"});
+      let h1 = this.document.createElement("h1");
+      h1.textContent = "Test actor header";
+      this.document.body.prepend(h1);
+      this.sendAsyncMessage("event:info",{info: "Added header woo!"});
+    }
+  }
+```
+
+To access the content document interface from the child actor, you need to refer to it using `this.document` - and `this.contentWindow` for the window object.
+
 # Startup Error
 
 Did you experience broken Firefox startup with message banner:
