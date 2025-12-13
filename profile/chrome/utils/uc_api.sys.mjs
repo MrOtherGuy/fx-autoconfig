@@ -43,7 +43,8 @@ export const Runtime = Object.freeze({
   config: null,
   restart: restartApplication,
   startupFinished: startupFinished,
-  loaderVersion: loaderModuleLink.version
+  loaderVersion: loaderModuleLink.loaderInfo.version,
+  loaderInfo: loaderModuleLink.loaderInfo
 });
 
 export const Utils = Object.freeze({
