@@ -773,7 +773,13 @@ Brand name of the browser eg. "Firefox", "Firefox Nightly" etc.
 Perhaps to be used in the future
 
 ### Runtime.loaderVersion -> `String`
-The version string of `boot.sys.mjs` 
+The version string of `boot.sys.mjs`
+
+### Runtime.loaderInfo -> `ScriptInfo`
+
+> New in `0.10.11`
+
+A `ScriptInfo` object containing metadata about the main loader module.
 
 ### Runtime.restart(clearCache)
 
