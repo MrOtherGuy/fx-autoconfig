@@ -796,6 +796,16 @@ export class windowUtils{
     }
     return Promise.reject(new Error("reference is not a window"))
   }
+  static getWindowChromeFlags(win){
+    const windowFlags = win.docShell.treeOwner
+      .QueryInterface(Ci.nsIInterfaceRequestor)
+      .getInterface(Ci.nsIAppWindow)
+      .chromeFlags;
+    return Object.fromEntries(
+      Object.entries(Ci.nsIWebBrowserChrome)
+      .map(([flag,value]) => [flag,(windowFlags & value) === value])
+    )
+  }
 }
 
 export function createElement(doc,tag,props,isHTML = false){
