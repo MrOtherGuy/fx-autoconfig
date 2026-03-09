@@ -1,6 +1,6 @@
 // ==UserScript==
 // @author MrOtherGuy
-// @version 0.10.11
+// @version 0.10.12
 // @homepageURL https://github.com/MrOtherGuy/fx-autoconfig
 // ==/UserScript==
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
@@ -601,6 +601,18 @@ class UserChrome_js{
     if(aSubject.document.isUncommittedInitialDocument){
       const parent = aSubject.parent;
       aSubject.addEventListener("DOMContentLoaded",()=>{
+        // If there's any better way to know if the subject is a dialog
+        // or not then please fix this.
+        // Note! window chromeFlag openas_dialog doesn't tell "dialoginess"
+        // for this purpose.
+        const isDialoglike = !aSubject.toolbar?.visible;
+        if(isDialoglike){
+          this.onDOMContent(aSubject.document);
+          if(this.PERSISTENT_DOMCONTENT_CALLBACK){
+            aSubject.addEventListener('DOMContentLoaded', this, { capture: true});
+          }
+          return
+        }
         parent.addEventListener("DOMContentLoaded",this,{once: !this.PERSISTENT_DOMCONTENT_CALLBACK, capture: true})
       },{once:true})
     }else{
