@@ -767,12 +767,20 @@ export class windowUtils{
   
   static waitWindowLoading(win){
     if(win && win.isChromeWindow){
+      if(!windowUtils.isBrowserWindow(win)){
+        if(win.document.readyState === "complete"){
+          return Promise.resolve(win)
+        }
+        return new Promise(res => {
+          win.addEventListener("load",()=>res(win),{once:true})
+        })
+      }
       if(loaderModuleLink.variant.FIREFOX){
-        if(win.gBrowserInit.delayedStartupFinished){
+        if(win.gBrowserInit?.delayedStartupFinished){
           return Promise.resolve(win);
         }
       }else{ // APP_VARIANT = THUNDERBIRD
-        if(win.gMailInit.delayedStartupFinished){
+        if(win.gMailInit?.delayedStartupFinished){
           return Promise.resolve(win);
         }
       }
