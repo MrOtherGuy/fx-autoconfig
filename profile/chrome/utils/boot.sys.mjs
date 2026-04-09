@@ -1,11 +1,11 @@
 // ==UserScript==
 // @author MrOtherGuy
-// @version 0.10.13
+// @version 0.10.14
 // @homepageURL https://github.com/MrOtherGuy/fx-autoconfig
 // @updateURL https://raw.githubusercontent.com/MrOtherGuy/fx-autoconfig/refs/heads/master/profile/chrome/utils/boot.sys.mjs
 // ==/UserScript==
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
-import { loaderModuleLink, Pref, FileSystem, windowUtils, showNotification, startupFinished, restartApplication, escapeXUL, toggleScript, extractScriptHeader, extractStyleHeader } from "chrome://userchromejs/content/utils.sys.mjs";
+import { loaderModuleLink, Pref, FileSystem, windowUtils, showNotification, startupFinished, restartApplication, escapeXUL, toggleScript, extractScriptHeader, extractStyleHeader, checkLoaderUpdate, L10n } from "chrome://userchromejs/content/utils.sys.mjs";
 
 console.warn( "Browser is executing custom scripts via autoconfig" );
 
@@ -338,41 +338,8 @@ function checkLoaderUpdateWhenIdle(){
   const updateCheckObserver = (subject,topic,data) => {
     if(topic === "idle"){
       idleService.removeIdleObserver(updateCheckObserver,10);
-      loaderModuleLink.loaderInfo.checkScriptUpdate()
-      .then(async update => {
-        const ignoreVersionPref = "userChromeJS.updates.ignore-version";
-        if(update.available && !(Services.prefs.getStringPref(ignoreVersionPref,"") === update.remoteVersion)){
-          console.log(update);
-          let l10n = new Localization(["browser/appMenuNotifications.ftl"]);
-          let [message] = await l10n.formatMessages(["appmenu-update-available2"])
-          let updateMsg = message.attributes.find(a => a.name === "label");
-          let dlMsg = message.attributes.find(a => a.name === "buttonlabel")?.value || "Download";
-          let dismissMsg = message.attributes.find(a => a.name === "secondarybuttonlabel")?.value || "Dismiss";
-          showNotification({
-            label : `fx-autoconfig: ${updateMsg?.value || "Update available"} (${update.localVersion} → ${update.remoteVersion})`,
-            type : "fx-autoconfig-update-notification",
-            priority: "info",
-            buttons: [{
-              label: dlMsg+"...",
-              callback: (notification) => {
-                notification.ownerGlobal.openWebLinkIn(
-                  "https://github.com/MrOtherGuy/fx-autoconfig/tree/master",
-                  "tab"
-                );
-                return false
-              }
-            },
-            {
-              label: dismissMsg,
-              callback: () => {
-                Services.prefs.setStringPref(ignoreVersionPref,update.remoteVersion)
-                return false
-              }
-            }]
-          })
-        }
-
-      })
+      const ignoreVersionPref = "userChromeJS.updates.ignore-version";
+      checkLoaderUpdate({ ignoreVersion: Services.prefs.getStringPref(ignoreVersionPref,""), ignoreIfAlreadyChecked: true})
     }
   };
   idleService.addIdleObserver(updateCheckObserver, 10)
@@ -594,13 +561,12 @@ class UserChrome_js{
       return null
     }
     const window = aDoc.ownerGlobal;
-    
-    window.MozXULElement.insertFTLIfNeeded("toolkit/about/aboutSupport.ftl");
     let menuFragment = window.MozXULElement.parseXULToFragment(`
       <menu id="userScriptsMenu" label="userScripts">
         <menupopup id="menuUserScriptsPopup">
           <menuseparator></menuseparator>
           <menuitem id="userScriptsMenu-OpenFolder" label="Open folder"></menuitem>
+          <menuitem id="userScriptsMenu-CheckUpdate" label="Check for updates" tooltiptext="Check for updates"></menuitem>
           <menuitem id="userScriptsMenu-Restart" label="Restart" tooltiptext="Toggling scripts requires restart"></menuitem>
           <menuitem id="userScriptsMenu-ClearCache" label="Restart and clear startup cache" tooltiptext="Toggling scripts requires restart"></menuitem>
         </menupopup>
@@ -634,18 +600,22 @@ class UserChrome_js{
         case "userScriptsMenu-ClearCache":
           restartApplication(true);
           break;
+        case "userScriptsMenu-CheckUpdate":
+          checkLoaderUpdate();
+          break;
         default:
           if(ev.target.dataset.filename){
             toggleScript(ev.target.dataset.filename);
           }
       }
     });
-    aDoc.l10n.formatValues(["restart-button-label","clear-startup-cache-label","show-dir-label"])
-    .then(values => {
+    Promise.all([L10n.formatValues(["restart-button-label","clear-startup-cache-label","show-dir-label"]),L10n.formatMessage("update-checkForUpdatesButton")])
+    .then(([values, updateMsg]) => {
       let baseTitle = `${values[0]} ${BRAND_NAME}`;
       aDoc.getElementById("userScriptsMenu-Restart").setAttribute("label", baseTitle);
       aDoc.getElementById("userScriptsMenu-ClearCache").setAttribute("label", values[1].replace("…","") + " & " + baseTitle);
-      aDoc.getElementById("userScriptsMenu-OpenFolder").setAttribute("label",values[2])
+      aDoc.getElementById("userScriptsMenu-OpenFolder").setAttribute("label",values[2]);
+      aDoc.getElementById("userScriptsMenu-CheckUpdate").setAttribute("label",updateMsg.attributes.find(a => a.name === "label")?.value || "Check for updates");
     });
     return popup.querySelector("#userScriptsMenu");
   }

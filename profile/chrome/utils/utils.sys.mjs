@@ -2,7 +2,8 @@ import { FileSystem } from "chrome://userchromejs/content/fs.sys.mjs";
 export { FileSystem };
 
 const lazy = {
-  startupPromises: new Set()
+  startupPromises: new Set(),
+  updateChecked: false
 };
 defineModuleGettersWithFallback(lazy,{
   CustomizableUI: {
@@ -12,6 +13,9 @@ defineModuleGettersWithFallback(lazy,{
 });
 ChromeUtils.defineESModuleGetters(lazy, {
     requestIdleCallback: "resource://gre/modules/Timer.sys.mjs"
+});
+ChromeUtils.defineLazyGetter(lazy, "l10n", () => {
+  return new Localization(["browser/appMenuNotifications.ftl", "browser/aboutDialog.ftl","toolkit/about/aboutSupport.ftl"])
 });
 const WidgetCallbacks = new Map();
 
@@ -1094,4 +1098,58 @@ export function compareVersionString(ver1, ver2){
     return -1
   }
   return 0
+}
+
+export const L10n = Object.freeze({
+  formatMessages(arr){
+    return lazy.l10n.formatMessages(arr)
+  },
+  async formatMessage(msg){
+    return (await lazy.l10n.formatMessages([msg]))[0]
+  },
+  formatValues(arr){
+    return lazy.l10n.formatValues(arr)
+  },
+  formatValue(val){
+    return lazy.l10n.formatValue(val)
+  }
+})
+
+export async function checkLoaderUpdate(opt = {}){
+  const { ignoreVersion, ignoreIfAlreadyChecked } = opt;
+  if(ignoreIfAlreadyChecked && lazy.updateChecked){
+    return
+  }
+  lazy.updateChecked = true;
+  let update = await loaderModuleLink.loaderInfo.checkScriptUpdate();
+
+  if(update.available && !(ignoreVersion === update.remoteVersion)){
+    let message = await L10n.formatMessage("appmenu-update-available2");
+    let updateMsg = message.attributes.find(a => a.name === "label");
+    let dlMsg = message.attributes.find(a => a.name === "buttonlabel")?.value || "Download";
+    let dismissMsg = message.attributes.find(a => a.name === "secondarybuttonlabel")?.value || "Dismiss";
+    showNotification({
+      label : `fx-autoconfig: ${updateMsg?.value || "Update available"} (${update.localVersion} → ${update.remoteVersion})`,
+      type : "fx-autoconfig-update-notification",
+      priority: "info",
+      buttons: [{
+        label: dlMsg+"...",
+        callback: (notification) => {
+          notification.ownerGlobal.openWebLinkIn(
+            "https://github.com/MrOtherGuy/fx-autoconfig/tree/master",
+            "tab"
+          );
+          return false
+        }
+      },
+      {
+        label: dismissMsg,
+        callback: () => {
+          const ignoreVersionPref = "userChromeJS.updates.ignore-version";
+          Services.prefs.setStringPref(ignoreVersionPref,update.remoteVersion)
+          return false
+        }
+      }]
+    })
+  }
 }
