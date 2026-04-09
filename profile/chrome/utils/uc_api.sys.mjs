@@ -18,7 +18,8 @@ const {
   updateStyleSheet,
   showNotification,
   defineModuleGettersWithFallback,
-  WindowActors
+  WindowActors,
+  compareVersionString
   } = ChromeUtils.importESModule("chrome://userchromejs/content/utils.sys.mjs");
 
 export {
@@ -52,7 +53,8 @@ export const Utils = Object.freeze({
   createWidget: createWidget,
   escapeXUL: escapeXUL,
   loadURI: loadURI,
-  defineModuleGettersWithFallback: defineModuleGettersWithFallback
+  defineModuleGettersWithFallback: defineModuleGettersWithFallback,
+  compareVersionString: compareVersionString
 });
 
 export const Scripts = Object.freeze({
