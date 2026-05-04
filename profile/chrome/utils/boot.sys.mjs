@@ -1,6 +1,6 @@
 // ==UserScript==
 // @author MrOtherGuy
-// @version 0.10.14
+// @version 0.10.15
 // @homepageURL https://github.com/MrOtherGuy/fx-autoconfig
 // @updateURL https://raw.githubusercontent.com/MrOtherGuy/fx-autoconfig/refs/heads/master/profile/chrome/utils/boot.sys.mjs
 // ==/UserScript==
@@ -285,7 +285,8 @@ function showgBrowserNotification(){
     buttons: [{
       label: "Why am I seeing this?",
       callback: (notification) => {
-        notification.ownerGlobal.openWebLinkIn(
+        const owner = notification.documentGlobal || notification.ownerGlobal;
+        owner.openWebLinkIn(
           "https://github.com/MrOtherGuy/fx-autoconfig#startup-error",
           "tab"
         );
@@ -560,7 +561,7 @@ class UserChrome_js{
     if(aDoc.location.href !== BROWSERCHROME || !popup){
       return null
     }
-    const window = aDoc.ownerGlobal;
+    const window = aDoc.documentGlobal || aDoc.ownerGlobal;
     let menuFragment = window.MozXULElement.parseXULToFragment(`
       <menu id="userScriptsMenu" label="userScripts">
         <menupopup id="menuUserScriptsPopup">
