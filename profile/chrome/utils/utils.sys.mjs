@@ -686,7 +686,7 @@ export const loaderModuleLink = new LoaderLink();
 
 export function extractScriptHeader(aFSResult){
   return aFSResult.content()
-    .match(/^\/\/ ==UserScript==\s*[\n\r]+(?:.*[\n\r]+)*?\/\/ ==\/UserScript==\s*/m)?.[0] || ""
+    .match(/^\/\/ ==UserScript==[^\r\n]*(?:\r?\n)(?:[^\r\n]*(?:\r?\n))*?\/\/ ==\/UserScript==[^\r\n]*/m)?.[0] || ""
 }
 export function extractStyleHeader(aFSResult){
   return aFSResult.content()
