@@ -690,7 +690,7 @@ export function extractScriptHeader(aFSResult){
 }
 export function extractStyleHeader(aFSResult){
   return aFSResult.content()
-    .match(/^\/\* ==UserScript==\s*[\n\r]+(?:.*[\n\r]+)*?\/\/ ==\/UserScript==\s*\*\//m)?.[0] || ""
+    .match(/^\/\* ==UserScript==[^\S\r\n]*\r?\n[\s\S]*?\/\/ ==\/UserScript==\s*\*\//m)?.[0] || ""
 }
 
 // getScriptData() returns these types of objects
