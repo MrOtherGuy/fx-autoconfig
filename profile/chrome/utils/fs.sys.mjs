@@ -74,7 +74,7 @@ export class FileSystem{
     if(typeof aFilename !== "string"){
       return FileSystemResult.fromErrorKind(FileSystem.ERROR_KIND_INVALID_ARGUMENT,{expected:"String"});
     }
-    const parts = aFilename.replace("\\","/").split("/").filter(a => a.length > 0);
+    const parts = aFilename.replace(/\\/g,"/").split("/").filter(a => a.length > 0);
     while(parts[0] === ".."){
       baseDirectory = baseDirectory.parent;
       parts.shift();
