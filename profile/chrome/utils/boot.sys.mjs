@@ -246,7 +246,7 @@ class ScriptData {
         }
       },
       matches: matches,
-      remoteTypes: ["privilegedabout",null],
+      remoteTypes: ["privilegedabout",null,""],
       includeChrome: true
     }
   }
