@@ -1,6 +1,6 @@
 // ==UserScript==
 // @author MrOtherGuy
-// @version 0.10.15
+// @version 0.10.16
 // @homepageURL https://github.com/MrOtherGuy/fx-autoconfig
 // @updateURL https://raw.githubusercontent.com/MrOtherGuy/fx-autoconfig/refs/heads/master/profile/chrome/utils/boot.sys.mjs
 // ==/UserScript==
@@ -246,8 +246,9 @@ class ScriptData {
         }
       },
       matches: matches,
-      remoteTypes: ["privilegedabout",null],
-      includeChrome: true
+      remoteTypes: ["privilegedabout",null,"parent"],
+      includeChrome: true,
+      allFrames: true
     }
   }
   static fromScriptFile(aFile){
