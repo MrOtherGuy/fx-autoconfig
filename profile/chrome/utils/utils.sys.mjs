@@ -703,17 +703,23 @@ export class ScriptInfo{
   asFile(){
     return FileSystem.getEntry(FileSystem.convertChromeURIToFileURI(this.chromeURI)).entry()
   }
-  async checkScriptUpdate(){
+  async checkScriptUpdate() {
+    let failure = {available: false, localVersion: this.version, remoteVersion: null, script: null};
     if(!(this.updateURL && this.version)){
-      return { available: false, localVersion: this.version, remoteVersion: null, script: null }
+      return failure;
     }
-    let response = await fetch(this.updateURL);
-    let content = FileSystem.StringContent({ content: await response.text() });
-    let scriptInfo = LoaderLink._cloneScriptInfo(loaderModuleLink, this, content, this.#scriptType);
-    let remoteVersion = scriptInfo.version;
-    const localVersion = this.version;
-    let available = compareVersionString(remoteVersion, localVersion) === 1;
-    return { localVersion, remoteVersion, available, script: { info: scriptInfo, response: content } }
+    try {
+      let response = await fetch(this.updateURL);
+      let content = FileSystem.StringContent({ content: await response.text() });
+      let scriptInfo = LoaderLink._cloneScriptInfo(loaderModuleLink, this, content, this.#scriptType);
+      let remoteVersion = scriptInfo.version;
+      const localVersion = this.version;
+      let available = compareVersionString(remoteVersion, localVersion) === 1;
+      return { localVersion, remoteVersion, available, script: { info: scriptInfo, response: content } }
+    } catch (e) {
+      console.error(e);
+      return failure;
+    }
   }
   static fromString(aName, aStringAsFSResult, isStyle) {
     return loaderModuleLink.createScriptInfo(aName, aStringAsFSResult, isStyle, false);
