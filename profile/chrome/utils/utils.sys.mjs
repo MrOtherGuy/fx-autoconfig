@@ -214,7 +214,7 @@ export class Hotkey{
       keySet = createElement(doc,"keyset",{id:"ucKeySet"});
       doc.body.appendChild(keySet);
     }
-    
+
     let key = createElement(doc,"key",details);
     keySet.appendChild(key);
     return
@@ -239,7 +239,7 @@ export class Hotkey{
   static NORMAL_KEY = 1;
   static FUN_KEY = 2;
   static VK_KEY = 4;
-  
+
   static #getKeyCategory(key){
     return (/^[\w-]$/).test(key)
           ? Hotkey.NORMAL_KEY
@@ -249,7 +249,7 @@ export class Hotkey{
               ? Hotkey.FUN_KEY
               : Hotkey.ERR_KEY
   }
-  
+
   static define(desc){
     let keyCategory = Hotkey.#getKeyCategory(desc.key);
     if(keyCategory === Hotkey.ERR_KEY){
@@ -548,9 +548,9 @@ function reloadStyleSheet(name, type) {
     }
     return all
   }
-  
+
   let sheets = recentWindow.InspectorUtils.getAllStyleSheets(recentWindow.document,false).flatMap( x => recurseImports(x,[x]) );
-  
+
   // If a sheet is imported multiple times, then there will be
   // duplicates, because style system does create an object for
   // each instace but that's OK since sheets.find below will
@@ -790,7 +790,7 @@ export class windowUtils{
     return window.document.documentElement.getAttribute("windowtype") === windowUtils.mainWindowType
   }
   static mainWindowType = loaderModuleLink.variant.FIREFOX ? "navigator:browser" : "mail:3pane";
-  
+
   static waitWindowLoading(win){
     if(win && win.isChromeWindow){
       if(!windowUtils.isBrowserWindow(win)){
@@ -850,7 +850,7 @@ export function createWidget(desc){
     throw new Error(`custom widget has unsupported type: '${desc.type}'`);
   }
   const CUI = lazy.CustomizableUI;
-  
+
   if(CUI.getWidget(desc.id)?.hasOwnProperty("source")){
     // very likely means that the widget with this id already exists
     // There isn't a very reliable way to 'really' check if it exists or not
@@ -890,12 +890,12 @@ export function createWidget(desc){
       for (let p in props){
         toolbaritem.setAttribute(p, props[p]);
       }
-      
+
       if(typeof callback === "function"){
         if(desc.allEvents){
-          toolbaritem.addEventListener("click",(ev) => WidgetCallbacks.get(ev.target.id)(ev,ev.target.ownerGlobal))
+          toolbaritem.addEventListener("click",(ev) => WidgetCallbacks.get(ev.target.id)(ev,(ev.target.documentGlobal || ev.target.ownerGlobal)))
         }else{
-          toolbaritem.addEventListener("click",(ev) => ev.button === 0 && WidgetCallbacks.get(ev.target.id)(ev,ev.target.ownerGlobal))
+          toolbaritem.addEventListener("click",(ev) => ev.button === 0 && WidgetCallbacks.get(ev.target.id)(ev,(ev.target.documentGlobal || ev.target.ownerGlobal)))
         }
       }
       for (let attr in desc){
@@ -938,8 +938,8 @@ export function loadURI(win,desc){
     return false
   }
   if(    !win
-      || !desc 
-      || !desc.url 
+      || !desc
+      || !desc.url
       || typeof desc.url !== "string"
       || !(["tab","tabshifted","window","current"]).includes(desc.where)
     ){
@@ -1135,7 +1135,7 @@ export async function checkLoaderUpdate(opt = {}){
       buttons: [{
         label: dlMsg+"...",
         callback: (notification) => {
-          notification.ownerGlobal.openWebLinkIn(
+          (notification.documentGlobal || notification.ownerGlobal).openWebLinkIn(
             "https://github.com/MrOtherGuy/fx-autoconfig/tree/master",
             "tab"
           );
