@@ -1129,21 +1129,23 @@ export async function checkLoaderUpdate(opt = {}){
   lazy.updateChecked = true;
   let update = await loaderModuleLink.loaderInfo.checkScriptUpdate();
   if (!update.available) {
-    let label, error = !update.remoteVersion;
-    if (error)
-      label = "fx-autoconfig: " + ((await L10n.formatMessage("aboutdialog-update-checking-failed"))?.value || "Failed to check for updates.");
-    else {
-      label = (await L10n.formatMessage("update-noUpdatesFound"))?.value;
-      if (!label?.includes("{-brand-short-name}"))
-        label = `{-brand-short-name} is up to date`;
-      label = label.replace("{-brand-short-name}", "fx-autoconfig");
+    if (isUserAction) {
+      let label, error = !update.remoteVersion;
+      if (error)
+        label = "fx-autoconfig: " + ((await L10n.formatMessage("aboutdialog-update-checking-failed"))?.value || "Failed to check for updates.");
+      else {
+        label = (await L10n.formatMessage("update-noUpdatesFound"))?.value;
+        if (!label?.includes("{-brand-short-name}"))
+          label = `{-brand-short-name} is up to date`;
+        label = label.replace("{-brand-short-name}", "fx-autoconfig");
+      }
+      showNotification({
+        label,
+        type: "fx-autoconfig-update-notification",
+        priority: error ? "critical" : "info",
+        buttons: [],
+      });
     }
-    showNotification({
-      label,
-      type: "fx-autoconfig-update-notification",
-      priority: error ? "critical" : "info",
-      buttons: [],
-    });
   } else if(isUserAction || !(ignoreVersion === update.remoteVersion)){
     let message = await L10n.formatMessage("appmenu-update-available2");
     let updateMsg = message.attributes.find(a => a.name === "label");
