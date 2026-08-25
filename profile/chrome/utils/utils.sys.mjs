@@ -15,7 +15,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
     requestIdleCallback: "resource://gre/modules/Timer.sys.mjs"
 });
 ChromeUtils.defineLazyGetter(lazy, "l10n", () => {
-  return new Localization(["browser/appMenuNotifications.ftl", "browser/aboutDialog.ftl","toolkit/about/aboutSupport.ftl"])
+  return new Localization(["browser/appMenuNotifications.ftl", "browser/aboutDialog.ftl","toolkit/about/aboutSupport.ftl","browser/defaultBrowserNotification.ftl"])
 });
 const WidgetCallbacks = new Map();
 
@@ -1116,18 +1116,35 @@ export const L10n = Object.freeze({
 })
 
 export async function checkLoaderUpdate(opt = {}){
-  const { ignoreVersion, ignoreIfAlreadyChecked } = opt;
+  const { ignoreVersion, ignoreIfAlreadyChecked, isUserAction } = opt;
   if(ignoreIfAlreadyChecked && lazy.updateChecked){
     return
   }
   lazy.updateChecked = true;
   let update = await loaderModuleLink.loaderInfo.checkScriptUpdate();
-
-  if(update.available && !(ignoreVersion === update.remoteVersion)){
+  if (!update.available) {
+    let label, error = !update.remoteVersion;
+    if (error)
+      label = "fx-autoconfig: " + ((await L10n.formatMessage("aboutdialog-update-checking-failed"))?.value || "Failed to check for updates.");
+    else {
+      label = (await L10n.formatMessage("update-noUpdatesFound"))?.value;
+      if (!label?.includes("{-brand-short-name}"))
+        label = `{-brand-short-name} is up to date`;
+      label = label.replace("{-brand-short-name}", "fx-autoconfig");
+    }
+    showNotification({
+      label,
+      type: "fx-autoconfig-update-notification",
+      priority: error ? "critical" : "info",
+      buttons: [],
+    });
+  } else if(isUserAction || !(ignoreVersion === update.remoteVersion)){
     let message = await L10n.formatMessage("appmenu-update-available2");
     let updateMsg = message.attributes.find(a => a.name === "label");
     let dlMsg = message.attributes.find(a => a.name === "buttonlabel")?.value || "Download";
-    let dismissMsg = message.attributes.find(a => a.name === "secondarybuttonlabel")?.value || "Dismiss";
+    let dismissMsg;
+    if (!isUserAction)
+      dismissMsg = (await L10n.formatMessage("default-browser-prompt-checkbox-not-again-label"))?.value || "Don’t show this message again";
     showNotification({
       label : `fx-autoconfig: ${updateMsg?.value || "Update available"} (${update.localVersion} → ${update.remoteVersion})`,
       type : "fx-autoconfig-update-notification",
@@ -1142,14 +1159,15 @@ export async function checkLoaderUpdate(opt = {}){
           return false
         }
       },
-      {
+      ...(isUserAction ? [] : [{
         label: dismissMsg,
         callback: () => {
           const ignoreVersionPref = "userChromeJS.updates.ignore-version";
           Services.prefs.setStringPref(ignoreVersionPref,update.remoteVersion)
           return false
         }
-      }]
+      }])
+      ]
     })
   }
 }
