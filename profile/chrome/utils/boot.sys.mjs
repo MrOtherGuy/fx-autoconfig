@@ -42,7 +42,7 @@ const MODULE_LOADER = new (function(){
   let compiledScript = null;
   let promise = ChromeUtils.compileScript("chrome://userchromejs/content/module_loader.mjs");
   promise.then(s => { compiledScript = s });
-  
+
   this.ready = () => {
     if(compiledScript){
       return Promise.resolve(compiledScript)
@@ -124,7 +124,7 @@ class ScriptData {
       let loadOrder = headerText.match(/\/\/ @loadOrder\s+(\d+)\s*$/im)?.[1];
       this.loadOrder = Number.parseInt(loadOrder) || 10;
     }
-    
+
     Object.freeze(this);
   }
   get isEnabled() {
@@ -402,14 +402,14 @@ class UserChrome_js{
       return
     }
     loaderModuleLink.setup(this,AppConstants.MOZ_APP_DISPLAYNAME_DO_NOT_USE,APP_VARIANT,ScriptData.createDummyScript,ScriptType);
-    
+
     if(!this.IS_ENABLED){
       Services.obs.addObserver(this, 'domwindowopened', false);
       this.initialized = true;
       return
     }
     // gBrowserHack setup
-    this.GBROWSERHACK_ENABLED = 
+    this.GBROWSERHACK_ENABLED =
       (Services.prefs.getBoolPref("userChromeJS.gBrowser_hack.required",false) ? 2 : 0)
     + (Services.prefs.getBoolPref("userChromeJS.gBrowser_hack.enabled",false) ? 1 : 0);
     this.PERSISTENT_DOMCONTENT_CALLBACK = Services.prefs.getBoolPref("userChromeJS.persistent_domcontent_callback",false);
@@ -496,7 +496,7 @@ class UserChrome_js{
     )
     if(this.IS_ENABLED){
       document.allowUnsafeHTML = false; // https://bugzilla.mozilla.org/show_bug.cgi?id=1432966
-      
+
       // This is a hack to make gBrowser available for scripts.
       // Without it, scripts would need to check if gBrowser exists and deal
       // with it somehow. See bug 1443849
@@ -518,12 +518,12 @@ class UserChrome_js{
       const disabledScripts = getDisabledScripts();
       // Note, sys.mjs scripts have .regex = null
       const scriptsForWindow = this.scripts.filter(s => s.regex?.test(window.location.href));
-      
+
       // .uc.mjs scripts are loaded via module loader
       if(scriptsForWindow.some(s => s.isESM && !disabledScripts.includes(s.filename))){
         MODULE_LOADER.ready().then(m => m.executeInGlobal(window));
       }
-      
+
       for(let script of scriptsForWindow){
         if(script.isESM || disabledScripts.includes(script.filename) || script.injectionFailed || script.noExec || (script.onlyonce && script.isRunning)) {
           continue
@@ -603,7 +603,7 @@ class UserChrome_js{
           restartApplication(true);
           break;
         case "userScriptsMenu-CheckUpdate":
-          checkLoaderUpdate();
+          checkLoaderUpdate({isUserAction: true});
           break;
         default:
           if(ev.target.dataset.filename){
@@ -655,7 +655,7 @@ class UserChrome_js{
       aSubject.addEventListener('DOMContentLoaded', this, {once: !this.PERSISTENT_DOMCONTENT_CALLBACK, capture: true});
     }
   }
-  
+
   handleEvent(aEvent){
     switch (aEvent.type){
       case "DOMContentLoaded":
@@ -665,7 +665,7 @@ class UserChrome_js{
         console.warn(new Error("unexpected event received",{cause:aEvent}));
     }
   }
-  
+
 }
 
 const _ucjs = !Services.appinfo.inSafeMode && new UserChrome_js();
