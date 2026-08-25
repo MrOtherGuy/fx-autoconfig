@@ -15,7 +15,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
     requestIdleCallback: "resource://gre/modules/Timer.sys.mjs"
 });
 ChromeUtils.defineLazyGetter(lazy, "l10n", () => {
-  return new Localization(["browser/appMenuNotifications.ftl", "browser/aboutDialog.ftl","toolkit/about/aboutSupport.ftl"])
+  return new Localization(["browser/appMenuNotifications.ftl", "browser/aboutDialog.ftl","toolkit/about/aboutSupport.ftl","browser/defaultBrowserNotification.ftl"])
 });
 const WidgetCallbacks = new Map();
 
@@ -214,7 +214,7 @@ export class Hotkey{
       keySet = createElement(doc,"keyset",{id:"ucKeySet"});
       doc.body.appendChild(keySet);
     }
-    
+
     let key = createElement(doc,"key",details);
     keySet.appendChild(key);
     return
@@ -239,7 +239,7 @@ export class Hotkey{
   static NORMAL_KEY = 1;
   static FUN_KEY = 2;
   static VK_KEY = 4;
-  
+
   static #getKeyCategory(key){
     return (/^[\w-]$/).test(key)
           ? Hotkey.NORMAL_KEY
@@ -249,7 +249,7 @@ export class Hotkey{
               ? Hotkey.FUN_KEY
               : Hotkey.ERR_KEY
   }
-  
+
   static define(desc){
     let keyCategory = Hotkey.#getKeyCategory(desc.key);
     if(keyCategory === Hotkey.ERR_KEY){
@@ -548,9 +548,9 @@ function reloadStyleSheet(name, type) {
     }
     return all
   }
-  
+
   let sheets = recentWindow.InspectorUtils.getAllStyleSheets(recentWindow.document,false).flatMap( x => recurseImports(x,[x]) );
-  
+
   // If a sheet is imported multiple times, then there will be
   // duplicates, because style system does create an object for
   // each instace but that's OK since sheets.find below will
@@ -703,17 +703,23 @@ export class ScriptInfo{
   asFile(){
     return FileSystem.getEntry(FileSystem.convertChromeURIToFileURI(this.chromeURI)).entry()
   }
-  async checkScriptUpdate(){
+  async checkScriptUpdate() {
+    let failure = {available: false, localVersion: this.version, remoteVersion: null, script: null};
     if(!(this.updateURL && this.version)){
-      return { available: false, localVersion: this.version, remoteVersion: null, script: null }
+      return failure;
     }
-    let response = await fetch(this.updateURL);
-    let content = FileSystem.StringContent({ content: await response.text() });
-    let scriptInfo = LoaderLink._cloneScriptInfo(loaderModuleLink, this, content, this.#scriptType);
-    let remoteVersion = scriptInfo.version;
-    const localVersion = this.version;
-    let available = compareVersionString(remoteVersion, localVersion) === 1;
-    return { localVersion, remoteVersion, available, script: { info: scriptInfo, response: content } }
+    try {
+      let response = await fetch(this.updateURL);
+      let content = FileSystem.StringContent({ content: await response.text() });
+      let scriptInfo = LoaderLink._cloneScriptInfo(loaderModuleLink, this, content, this.#scriptType);
+      let remoteVersion = scriptInfo.version;
+      const localVersion = this.version;
+      let available = compareVersionString(remoteVersion, localVersion) === 1;
+      return { localVersion, remoteVersion, available, script: { info: scriptInfo, response: content } }
+    } catch (e) {
+      console.error(e);
+      return failure;
+    }
   }
   static fromString(aName, aStringAsFSResult, isStyle) {
     return loaderModuleLink.createScriptInfo(aName, aStringAsFSResult, isStyle, false);
@@ -790,7 +796,7 @@ export class windowUtils{
     return window.document.documentElement.getAttribute("windowtype") === windowUtils.mainWindowType
   }
   static mainWindowType = loaderModuleLink.variant.FIREFOX ? "navigator:browser" : "mail:3pane";
-  
+
   static waitWindowLoading(win){
     if(win && win.isChromeWindow){
       if(!windowUtils.isBrowserWindow(win)){
@@ -850,7 +856,7 @@ export function createWidget(desc){
     throw new Error(`custom widget has unsupported type: '${desc.type}'`);
   }
   const CUI = lazy.CustomizableUI;
-  
+
   if(CUI.getWidget(desc.id)?.hasOwnProperty("source")){
     // very likely means that the widget with this id already exists
     // There isn't a very reliable way to 'really' check if it exists or not
@@ -890,12 +896,12 @@ export function createWidget(desc){
       for (let p in props){
         toolbaritem.setAttribute(p, props[p]);
       }
-      
+
       if(typeof callback === "function"){
         if(desc.allEvents){
-          toolbaritem.addEventListener("click",(ev) => WidgetCallbacks.get(ev.target.id)(ev,ev.target.ownerGlobal))
+          toolbaritem.addEventListener("click",(ev) => WidgetCallbacks.get(ev.target.id)(ev,(ev.target.documentGlobal || ev.target.ownerGlobal)))
         }else{
-          toolbaritem.addEventListener("click",(ev) => ev.button === 0 && WidgetCallbacks.get(ev.target.id)(ev,ev.target.ownerGlobal))
+          toolbaritem.addEventListener("click",(ev) => ev.button === 0 && WidgetCallbacks.get(ev.target.id)(ev,(ev.target.documentGlobal || ev.target.ownerGlobal)))
         }
       }
       for (let attr in desc){
@@ -938,8 +944,8 @@ export function loadURI(win,desc){
     return false
   }
   if(    !win
-      || !desc 
-      || !desc.url 
+      || !desc
+      || !desc.url
       || typeof desc.url !== "string"
       || !(["tab","tabshifted","window","current"]).includes(desc.where)
     ){
@@ -1116,18 +1122,37 @@ export const L10n = Object.freeze({
 })
 
 export async function checkLoaderUpdate(opt = {}){
-  const { ignoreVersion, ignoreIfAlreadyChecked } = opt;
+  const { ignoreVersion, ignoreIfAlreadyChecked, isUserAction } = opt;
   if(ignoreIfAlreadyChecked && lazy.updateChecked){
     return
   }
   lazy.updateChecked = true;
   let update = await loaderModuleLink.loaderInfo.checkScriptUpdate();
-
-  if(update.available && !(ignoreVersion === update.remoteVersion)){
+  if (!update.available) {
+    if (isUserAction) {
+      let label, error = !update.remoteVersion;
+      if (error)
+        label = "fx-autoconfig: " + ((await L10n.formatMessage("aboutdialog-update-checking-failed"))?.value || "Failed to check for updates.");
+      else {
+        label = (await L10n.formatMessage("update-noUpdatesFound"))?.value;
+        if (!label?.includes("{-brand-short-name}"))
+          label = `{-brand-short-name} is up to date`;
+        label = label.replace("{-brand-short-name}", "fx-autoconfig");
+      }
+      showNotification({
+        label,
+        type: "fx-autoconfig-update-notification",
+        priority: error ? "critical" : "info",
+        buttons: [],
+      });
+    }
+  } else if(isUserAction || !(ignoreVersion === update.remoteVersion)){
     let message = await L10n.formatMessage("appmenu-update-available2");
     let updateMsg = message.attributes.find(a => a.name === "label");
     let dlMsg = message.attributes.find(a => a.name === "buttonlabel")?.value || "Download";
-    let dismissMsg = message.attributes.find(a => a.name === "secondarybuttonlabel")?.value || "Dismiss";
+    let dismissMsg;
+    if (!isUserAction)
+      dismissMsg = (await L10n.formatMessage("default-browser-prompt-checkbox-not-again-label"))?.value || "Don’t show this message again";
     showNotification({
       label : `fx-autoconfig: ${updateMsg?.value || "Update available"} (${update.localVersion} → ${update.remoteVersion})`,
       type : "fx-autoconfig-update-notification",
@@ -1135,21 +1160,22 @@ export async function checkLoaderUpdate(opt = {}){
       buttons: [{
         label: dlMsg+"...",
         callback: (notification) => {
-          notification.ownerGlobal.openWebLinkIn(
+          (notification.documentGlobal || notification.ownerGlobal).openWebLinkIn(
             "https://github.com/MrOtherGuy/fx-autoconfig/tree/master",
             "tab"
           );
           return false
         }
       },
-      {
+      ...(isUserAction ? [] : [{
         label: dismissMsg,
         callback: () => {
           const ignoreVersionPref = "userChromeJS.updates.ignore-version";
           Services.prefs.setStringPref(ignoreVersionPref,update.remoteVersion)
           return false
         }
-      }]
+      }])
+      ]
     })
   }
 }
